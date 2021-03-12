@@ -1,33 +1,14 @@
 from semver import *
+from package_ref import *
 
 
-class pkg:
-    def __init__(self):
-        self.Path = ""
-        self.Version = ""
-        self.Source = ""
-        self.Revision = ""
-
-    def set_path(self, path):
-        self.Path = path
-
-    def set_version(self, version):
-        self.Version = version
-
-    def set_source(self, source):
-        self.Source = source
-
-    def set_revision(self, revision):
-        self.Revision = revision
-
-
-def parse_gopkg_lock(filedescriptor, data):
+def parse_gopkg_lock(file_type_descriptor, data):
     reference = []
-    datatostr = str(data, encoding="utf-8")
     lineno = 0
-    lines = datatostr.split("/n")
+    lines = data.split("\n")
     list_length = -1
     for line in lines:
+        # print(line)
         lineno = lineno + 1
 
         i = line.find("#")
@@ -66,21 +47,21 @@ def parse_gopkg_lock(filedescriptor, data):
         else:
             if key == "version":
                 if not isvalid(val) or canonical(val) != val:
-                    break
+                    continue
                 else:
                     reference[list_length - 1].set_version(val)
             else:
                 reference[list_length - 1].set_revision(val)
 
-        cnt = 0
-        for r in reference:
-            if r.Path == "" or (r.Version == "" and r.Revision == ""):
-                print("wrong reference!")
-            else:
-                print("---------" + str(cnt) + "---------")
-                print(r.Path + " : " + r.Revision + " ( " + r.Version + " )")
+    cnt = 0
+    for r in reference:
+        if r.Path == "" or (r.Version == "" and r.Revision == ""):
+            print("wrong reference!")
+        else:
+            print("---------" + str(cnt) + "---------")
+            print(r.Path + " : " + r.Revision + " ( " + r.Version + " )")
 
-            cnt = cnt + 1
+        cnt = cnt + 1
 
 
 

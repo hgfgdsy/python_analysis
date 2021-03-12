@@ -14,11 +14,11 @@ def str_compare(filename):
 def choose_file(pathname):
     files = os.listdir(pathname)
     target_file_count = 0
-    file_descriptor = 0
+    file_type_descriptor = 0
     for file in files:
         if not os.path.isdir(file):
             if str_compare(file) != 0:
-                file_descriptor = str_compare(file)
+                file_type_descriptor = str_compare(file)
                 target_file_count = target_file_count + 1
     if target_file_count != 1:
         if target_file_count == 0:
@@ -26,4 +26,4 @@ def choose_file(pathname):
         elif target_file_count > 1:
             print("too many possible Configfile found: In " + pathname + " !\n")
     else:
-        read_in_file(pathname, file_descriptor)
+        read_in_file(pathname, file_type_descriptor)
