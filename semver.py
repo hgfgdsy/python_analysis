@@ -167,3 +167,10 @@ def canonical(v):
         return v + p.short
 
     return v
+
+
+def get_major(v):
+    p, ok = parse(v)
+    if ok:
+        return p.major
+    return '0'

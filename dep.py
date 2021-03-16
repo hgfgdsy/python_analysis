@@ -1,5 +1,8 @@
 from semver import *
 from package_ref import *
+from suffix import *
+
+import re
 
 
 def parse_gopkg_lock(file_type_descriptor, data):
@@ -62,6 +65,82 @@ def parse_gopkg_lock(file_type_descriptor, data):
             print(r.Path + " : " + r.Revision + " ( " + r.Version + " )")
 
         cnt = cnt + 1
+
+    # use_versions = []
+    # for r in reference:
+    #     if r.Path == "" or (r.Version == "" and r.Revision == ""):
+    #         print("wrong reference!")
+    #     else:
+    #         use_version = -3
+    #         if r.Version != "":
+    #             if not re.findall(r'github.com', r.Path):
+    #                 use_version = -2
+    #             else:
+    #                 use_version = get_version_type(r.Path, r.Version)
+    #
+    #         use_versions.append(use_version)
+    #         if r.Version != "":
+    #             if use_version == -2:  # TODO(download pkgs from other sources)
+    #                 versions.append(r.Revision)
+    #
+    #             if use_version == -1:
+    #                 versions.append(r.Revision)
+    #                 print("It should not occur!(where major version doesn't equal to version in module path)")
+    #
+    #             if use_version == 0:  # no go.mod in dst pkg
+    #                 versions.append(r.Version + '+incompatible')
+    #
+    #             if use_version == 1: # has go.mod but in module path no version suffix
+    #                 versions.append(r.Revision)
+    #
+    #             if use_version >= 2:
+    #                 versions
+
+    requires = []
+    for r in reference:
+        if r.Path == "" or (r.Version == "" and r.Revision == ""):
+            print("wrong reference!")
+        else:
+            if r.Source != "None":
+                path = r.Source
+            else:
+                path = r.Path
+            if not re.findall(r'^github.com/', path):  # TODO(download pkgs from other sources)
+                if r.Version != "":
+                    requires.append(path + ' ' + r.Version)
+                else:
+                    requires.append(path + ' ' + r.Revision)
+            else:
+                if r.Version != "":
+                    use_version = get_version_type(path, r.Version)
+                    if use_version == -1:
+                        print("It should not occur!(where major version doesn't equal to version in module path)")
+
+                    if use_version == 0:  # no go.mod in dst pkg
+                        requires.append(path + ' ' + r.Version + '+incompatible')
+
+                    if use_version == 1:  # has go.mod but in module path no version suffix
+                        requires.append(path + ' ' + r.Revision)
+
+                    if use_version >= 2:
+                        requires.append(path + '/' + str(use_version) + ' ' + r.Version)
+                else:
+                    requires.append(path + ' ' + r.Revision)
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
