@@ -5,7 +5,7 @@ import os
 import zipfile
 
 
-class DOWNLOAD:
+class DOWNLOADMOD:
     def __init__(self, repo_msg):
         # token = get_token()
         # token_str = 'token ' + token
@@ -30,7 +30,7 @@ class DOWNLOAD:
         path = '.'
         save_name = os.path.join(path, temp)
         self.save_name = save_name
-        repo_name = self.repo[0].replace('github.com/', '')
+        repo_name = self.repo[0]
         repo_version = self.repo[1]
         filename = os.path.join(temp, repo_name.replace('/', '=') + '@' + repo_version)  # kiali=kiali@v1.0.0
         # judge dir exit or not
@@ -40,7 +40,7 @@ class DOWNLOAD:
         # print(check_result)
         if not check_result:
             # create url
-            url = 'https://github.com.cnpmjs.org/{}/archive/{}.zip'.format(repo_name, repo_version)
+            url = 'https://github.com/{}/archive/{}.zip'.format(repo_name, repo_version)
             try:
                 r = requests.get(url=url, headers=self.headers, stream=True)
                 with open(f'{os.path.join(path, filename)}.zip', 'wb') as f:

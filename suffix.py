@@ -4,6 +4,7 @@ from semver import get_major
 
 import os
 import re
+import shutil
 
 
 def get_major_in_module(module):
@@ -49,12 +50,27 @@ def get_version_type(name, version):
 
     major = get_major(version)
     if int(major) < 2:
-        return 1
+        return -11
 
     get_dep = DOWNLOAD([name, version])
     get_dep.down_load_unzip()
-    pkg_name = os.listdir(os.path.join(get_dep.save_name, '1'))[0]
-    r_type = get_local_pkg(pkg_name)
+    download_result = get_dep.download_result
+    cnt = 0
+    while download_result == -1:
+        shutil.rmtree(get_dep.dst_name)
+        get_dep.down_load_unzip()
+        download_result = get_dep.download_result
+        cnt = cnt + 1
+        if cnt > 5:
+            break
+
+    if download_result != -1:
+        pkg_name = os.listdir(os.path.join(get_dep.save_name, '1'))[0]
+        pkg_path = os.path.join(os.path.join(os.path.join(get_dep.save_name, '1'), pkg_name))
+        r_type = get_local_pkg(pkg_path)
+    else:
+        r_type = -10
+    shutil.rmtree(get_dep.dst_name)
     if r_type < 2:
         return r_type
     if r_type != int(major):

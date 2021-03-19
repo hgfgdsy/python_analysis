@@ -1,0 +1,45 @@
+module github.com/hgfgdsy/hhh
+
+go 1.15
+
+require (
+github.com/caicloud/cyclone d8ad3670d0bb664da112c6f15443279f71eb2c85
+github.com/caicloud/nirvana v0.2.1
+github.com/fatih/color v1.7.0
+github.com/ghodss/yaml v1.0.0
+github.com/gogo/protobuf v1.2.1
+github.com/golang/glog 23def4e6c14b4da8ac2ed8007337bc5eb5007998
+github.com/golang/protobuf v1.3.1
+github.com/google/btree v1.0.0
+github.com/google/gofuzz v1.0.0
+github.com/googleapis/gnostic v0.2.0
+github.com/gregjones/httpcache 3befbb6ad0cc97d4c25d851e9528915809e1a22f
+github.com/imdario/mergo v0.3.7
+github.com/inconshreveable/mousetrap 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+github.com/json-iterator/go v1.1.6
+github.com/konsorten/go-windows-terminal-sequences v1.0.2
+github.com/kyokomi/emoji v2.1.0+incompatible
+github.com/mattn/go-colorable v0.0.9
+github.com/mattn/go-isatty v0.0.8
+github.com/mattn/go-runewidth v0.0.4
+github.com/modern-go/concurrent bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
+github.com/modern-go/reflect2 4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd
+github.com/petar/GoLLRB 33fb24c13b99c46c93183c291836c573ac382536
+github.com/peterbourgon/diskv/v3 v3.0.0
+github.com/sirupsen/logrus v1.4.2
+github.com/spf13/cobra v0.0.4
+github.com/spf13/pflag v1.0.3
+golang.org/x/crypto 22d7a77e9e5f409e934ed268692e56707cd169e5
+golang.org/x/net f3200d17e092c607f615320ecaad13d87ad9a2b3
+golang.org/x/oauth2 aaccbc9213b0974828f81aaac109d194880e3014
+golang.org/x/sys c3d486d151ced6de5bcfe3c26c9b9f22cc526edc
+golang.org/x/text v0.3.2
+golang.org/x/time 9d24e82272b4f38b78bc8cff74fa936d31ccd8ef
+google.golang.org/appengine v1.6.0
+gopkg.in/inf.v0 v0.9.1
+gopkg.in/yaml.v2 v2.2.2
+k8s.io/api b503174bad5991eb66f18247f52e41c3258f6348
+k8s.io/apiextensions-apiserver 0cd23ebeb6882bd1cdc2cb15fc7b2d72e8a86a5b
+k8s.io/apimachinery eddba98df674a16931d2d4ba75edc3a389bf633a
+k8s.io/client-go d082d5923d3cc0bfbb066ee5fbdea3d0ca79acf8
+)

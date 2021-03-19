@@ -33,5 +33,7 @@ def parse_glide_lock(file_type_descriptor, data):
                 another.set_revision(version)
                 reference.append(another)
 
+    return reference
+
 
 

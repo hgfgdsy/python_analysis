@@ -2,7 +2,8 @@ from semver import *
 from package_ref import *
 from suffix import *
 
-import re
+import urllib
+from ctypes import cdll, c_char_p
 
 
 def parse_gopkg_lock(file_type_descriptor, data):
@@ -46,7 +47,19 @@ def parse_gopkg_lock(file_type_descriptor, data):
         if key == "name":
             reference[list_length - 1].set_path(val)
         elif key == "source":
-            reference[list_length - 1].set_source(val)
+            if val != "":
+                lib = cdll.LoadLibrary('./dc.o')
+
+                # print(lib.Sum(1, 2))
+                lib.DecodeSource.argtype = c_char_p
+                lib.DecodeSource.restype = c_char_p
+
+                out = lib.DecodeSource(bytes(val, encoding="utf8"))
+
+                source = out.decode('utf-8')
+
+                if source != "":
+                    reference[list_length - 1].set_source(val)
         else:
             if key == "version":
                 if not isvalid(val) or canonical(val) != val:
@@ -56,94 +69,14 @@ def parse_gopkg_lock(file_type_descriptor, data):
             else:
                 reference[list_length - 1].set_revision(val)
 
-    cnt = 0
-    for r in reference:
-        if r.Path == "" or (r.Version == "" and r.Revision == ""):
-            print("wrong reference!")
-        else:
-            print("---------" + str(cnt) + "---------")
-            print(r.Path + " : " + r.Revision + " ( " + r.Version + " )")
-
-        cnt = cnt + 1
-
-    # use_versions = []
+    # cnt = 0
     # for r in reference:
     #     if r.Path == "" or (r.Version == "" and r.Revision == ""):
     #         print("wrong reference!")
     #     else:
-    #         use_version = -3
-    #         if r.Version != "":
-    #             if not re.findall(r'github.com', r.Path):
-    #                 use_version = -2
-    #             else:
-    #                 use_version = get_version_type(r.Path, r.Version)
+    #         print("---------" + str(cnt) + "---------")
+    #         print(r.Path + " : " + r.Revision + " ( " + r.Version + " )")
     #
-    #         use_versions.append(use_version)
-    #         if r.Version != "":
-    #             if use_version == -2:  # TODO(download pkgs from other sources)
-    #                 versions.append(r.Revision)
-    #
-    #             if use_version == -1:
-    #                 versions.append(r.Revision)
-    #                 print("It should not occur!(where major version doesn't equal to version in module path)")
-    #
-    #             if use_version == 0:  # no go.mod in dst pkg
-    #                 versions.append(r.Version + '+incompatible')
-    #
-    #             if use_version == 1: # has go.mod but in module path no version suffix
-    #                 versions.append(r.Revision)
-    #
-    #             if use_version >= 2:
-    #                 versions
+    #     cnt = cnt + 1
 
-    requires = []
-    for r in reference:
-        if r.Path == "" or (r.Version == "" and r.Revision == ""):
-            print("wrong reference!")
-        else:
-            if r.Source != "None":
-                path = r.Source
-            else:
-                path = r.Path
-            if not re.findall(r'^github.com/', path):  # TODO(download pkgs from other sources)
-                if r.Version != "":
-                    requires.append(path + ' ' + r.Version)
-                else:
-                    requires.append(path + ' ' + r.Revision)
-            else:
-                if r.Version != "":
-                    use_version = get_version_type(path, r.Version)
-                    if use_version == -1:
-                        print("It should not occur!(where major version doesn't equal to version in module path)")
-
-                    if use_version == 0:  # no go.mod in dst pkg
-                        requires.append(path + ' ' + r.Version + '+incompatible')
-
-                    if use_version == 1:  # has go.mod but in module path no version suffix
-                        requires.append(path + ' ' + r.Revision)
-
-                    if use_version >= 2:
-                        requires.append(path + '/' + str(use_version) + ' ' + r.Version)
-                else:
-                    requires.append(path + ' ' + r.Revision)
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return reference
