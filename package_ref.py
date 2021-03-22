@@ -4,6 +4,7 @@ class pkg:
         self.Version = ""
         self.Source = ""
         self.Revision = ""
+        self.direct = -1
 
     def set_path(self, path):
         self.Path = path
@@ -16,3 +17,6 @@ class pkg:
 
     def set_revision(self, revision):
         self.Revision = revision
+
+    def set_direct(self, direct):
+        self.direct = direct

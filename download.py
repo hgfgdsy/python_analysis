@@ -19,6 +19,7 @@ class DOWNLOAD:
 
     def down_load_unzip(self):
         cnt = 0
+
         while os.path.isdir('temp_hm_' + str(cnt)):
             cnt = cnt + 1
 
@@ -40,7 +41,7 @@ class DOWNLOAD:
         # print(check_result)
         if not check_result:
             # create url
-            url = 'https://github.com.cnpmjs.org/{}/archive/{}.zip'.format(repo_name, repo_version)
+            url = 'https://github.com/{}/archive/{}.zip'.format(repo_name, repo_version)
             try:
                 r = requests.get(url=url, headers=self.headers, stream=True)
                 with open(f'{os.path.join(path, filename)}.zip', 'wb') as f:

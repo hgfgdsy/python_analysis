@@ -13,6 +13,8 @@ import pymysql
 
 from missing import *
 
+from tool.repo import check_insert_mes, get_down_repo_msg, get_repo_now_name
+
 
 def get_db_search():
     host = '47.88.48.19'
@@ -48,10 +50,13 @@ def get_token():  # download 重复
     # token 6f8454c973d4f7f07a57c2982db79d2ce543403d [zs] x
     # token 3e87d1e3a489815cdf597a10b426ad1e2a7426db [zs]
     # token 24748c727dfbcbfa18c3478f495c2b8b6ed1703e [ql]
-    token_list = ['0a6cca72aa3cc98993950500c87831bfef7e5707', '24748c727dfbcbfa18c3478f495c2b8b6ed1703e',
-                  '3e87d1e3a489815cdf597a10b426ad1e2a7426db']
-    index_num = random.randint(0, 2)
-    return token_list[index_num]
+
+    # token_list = ['0a6cca72aa3cc98993950500c87831bfef7e5707', '24748c727dfbcbfa18c3478f495c2b8b6ed1703e',
+    #               '3e87d1e3a489815cdf597a10b426ad1e2a7426db']
+    # index_num = random.randint(0, 2)
+    # return token_list[index_num]
+
+    return '2dcf8df8093697b00207ec01051847f269987e33'
 
 
 def get_headers():
@@ -165,15 +170,15 @@ def check_repo_valid(in_repo_name, in_version):
             page_detail = get_results(repo_url, headers)
         except Exception as exp:
 
-            # print("Maybe cannot find version: ", exp, '**************************************************')
+            print("Maybe cannot find version: ", exp, '**************************************************')
             repo_url = 'https://api.github.com/repos/' + in_repo_name
             try:
                 page_detail = get_results(repo_url, headers)
                 insert_error = 2
-                # print(in_repo_name, insert_error, 'The repo version name is not correct!')
+                print(in_repo_name, insert_error, 'The repo version name is not correct!')
             except Exception as exp:
                 insert_error = 1
-                # print(in_repo_name, insert_error, 'The repo name is not correct:', exp, '*************************')
+                print(in_repo_name, insert_error, 'The repo name is not correct:', exp, '*************************')
     else:
         insert_error = 0
     # print('check_insert_mes', insert_error)
@@ -313,7 +318,7 @@ def read_in_file(pathname, file_type_descriptor):
                         requires.append(path + ' ' + r.Revision)
                 else:
                     if r.Version != "":
-                        valid = check_repo_db_for_valid(path, r.Version, "")
+                        valid = check_repo_db_for_valid(path.replace('github.com/', ''), r.Version, "")
                         if valid == -1:
                             valid = check_repo_valid(path, r.Version)
 
@@ -329,7 +334,7 @@ def read_in_file(pathname, file_type_descriptor):
                             if new_path == '':
                                 err = MessageMiss(path, r.Version, 1)
                                 errors.append(err)
-                            else:
+                            elif valid != 0:
                                 replaces.append((path, new_path, r.Version))
                                 valid = 0
 
@@ -355,7 +360,7 @@ def read_in_file(pathname, file_type_descriptor):
                                 if new_path == '':
                                     err = MessageMiss(path, r.Revision, 1)
                                     errors.append(err)
-                                else:
+                                elif valid != 0:
                                     replaces.append((path, new_path, r.Revision))
                                     valid = 0
 
@@ -365,6 +370,7 @@ def read_in_file(pathname, file_type_descriptor):
 
                             if valid == 0:
                                 requires.append(path + ' ' + r.Revision)
+                                continue
                             else:
                                 continue
 
@@ -388,10 +394,15 @@ def read_in_file(pathname, file_type_descriptor):
                         if use_version >= 2:
                             requires.append(path + '/' + 'v' + str(use_version) + ' ' + r.Version)
                     else:
-                        valid = check_repo_db_for_valid(path, "", r.Revision)
+                        valid = check_repo_db_for_valid(path.replace('github.com/', ''), "", r.Revision)
 
+                        if path == 'github.com/caicloud/cyclone':
+                            print(valid)
                         if valid == -1:
                             valid = check_repo_valid(path, r.Revision)
+
+                        if path == 'github.com/caicloud/cyclone':
+                            print(valid)
 
                         new_path = ''
                         if valid == 1:
@@ -405,7 +416,7 @@ def read_in_file(pathname, file_type_descriptor):
                             if new_path == '':
                                 err = MessageMiss(path, r.Revision, 1)
                                 errors.append(err)
-                            else:
+                            elif valid != 0:
                                 replaces.append((path, new_path, r.Revision))
                                 valid = 0
 
@@ -416,8 +427,11 @@ def read_in_file(pathname, file_type_descriptor):
                         if valid != 0:
                             continue
                         requires.append(path + ' ' + r.Revision)
+        for r in requires:
+            print(r)
 
-        write_go_mod(requires)
+        for r in replaces:
+            print(r)
 
     else:
         f = open(pathname + "/glide.lock")
