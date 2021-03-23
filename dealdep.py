@@ -225,6 +225,8 @@ def get_all_direct_depmod(import_list, mod_dep_list):
     direct_dep_list = []
 
 
+
+
 def deal_local_repo_dir(repo_id, repo_name, repo_version):
     go_list = []
     mod_list = []
