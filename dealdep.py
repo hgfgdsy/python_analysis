@@ -3,8 +3,9 @@ import re
 
 import chardet
 
+
 def get_tool_name_list():
-    tool_name_list = ['Godeps.json', 'vendor.conf', 'vendor.json', 'glide.yaml', 'glide.toml', 'Gopkg.toml', 'Godep.json']
+    tool_name_list = ['Godeps.json', 'vendor.conf', 'vendor.json', 'GLOCKFILE', 'dependencies.tsv', 'vendor.manifest', 'vendor.yml']
     return tool_name_list
 
 
@@ -142,8 +143,25 @@ def deal_local_repo(root_url, local_url, go_list, mod_list, tool_list):
     for f in local_list:
         n_path = os.path.join(local_url, f)
         n_r_path = n_path.replace(root_url, '')
-        if os.path.isdir(n_path) and f != 'vendor':
-            dir_list.append(n_path)
+        if os.path.isdir(n_path):
+            if f == 'vendor':
+                vlist = os.listdir(n_path)  # vendor/vendor.json vendor/vendor.manifest
+                for item in vlist:
+                    if os.path.isfile(item):
+                        if item in tool_name_list:
+                            n_rr_path = os.path.join(n_r_path, item)
+                            if n_rr_path not in tool_list:
+                                tool_list.append(n_rr_path)
+            elif f == 'Godeps':
+                glist = os.listdir(n_path)  # vendor/vendor.json vendor/vendor.manifest
+                for item in glist:
+                    if os.path.isfile(item):
+                        if item in tool_name_list:
+                            n_rr_path = os.path.join(n_r_path, item)
+                            if n_rr_path not in tool_list:
+                                tool_list.append(n_rr_path)
+            else:
+                dir_list.append(n_path)
         elif os.path.isfile(n_path):
             if re.findall(r"\.go$", f):
                 if n_r_path not in go_list:
@@ -167,7 +185,8 @@ def deal_local_repo(root_url, local_url, go_list, mod_list, tool_list):
     return go_list, mod_list, tool_list
 
 
-def l_deal_tool(repo_tool, repo_url, repo_name):
+def l_deal_tool(tool_list, repo_url, repo_name):
+
     return []
 
 
@@ -225,8 +244,6 @@ def get_all_direct_depmod(import_list, mod_dep_list):
     direct_dep_list = []
 
 
-
-
 def deal_local_repo_dir(repo_id, repo_name, repo_version):
     go_list = []
     mod_list = []
@@ -249,8 +266,7 @@ def deal_local_repo_dir(repo_id, repo_name, repo_version):
         (mod_dep_list, mod_rep_list, go_mod_module) = l_deal_mod(mod_list, repo_url, repo_name)
 
     if tool_list:
-        repo_tool = tool_list[0]
-        tool_dep_list = l_deal_tool(repo_tool, repo_url, repo_name)
+        tool_dep_list = l_deal_tool(tool_list, repo_url, repo_name)
 
     (import_list, self_ref) = deal_go_files(go_list, repo_url, go_mod_module)
 
