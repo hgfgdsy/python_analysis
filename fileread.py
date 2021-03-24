@@ -15,6 +15,8 @@ from dealdep import deal_local_repo_dir
 from missing import *
 import os
 
+import subprocess
+
 from tool.repo import check_insert_mes, get_down_repo_msg, get_repo_now_name
 
 
@@ -292,6 +294,18 @@ def get_new_url(old_url):
         return ''
 
 
+def get_diffs(reference, all_direct_r, all_direct_dep):
+    return []
+
+
+def out_to_list(a, b):
+    return []
+
+
+def download_a_repo(repo):
+    return
+
+
 def read_in_file(pathname, file_type_descriptor):
     errors = []
     replaces = []
@@ -302,7 +316,183 @@ def read_in_file(pathname, file_type_descriptor):
         reference = parse_gopkg_lock(file_type_descriptor, data)
         repo_id = re.findall(r'/(.+?)$', pathname)
 
-        all_direct_dep = deal_local_repo_dir(repo_id, 1, reference)
+        requires = []
+
+        (all_direct_r, all_direct_dep) = deal_local_repo_dir(repo_id, 1, reference)
+        count = 0
+        for d in all_direct_dep:
+            r = all_direct_r[count]
+            count = count + 1
+            origin_repo_name = d[2]
+            github_repo_name = d[0]
+            path = 'github.com/' + github_repo_name
+            if r.Version != '':
+                if d[4] != '':
+                    github_repo_name = d[4]
+                    replaces.append((origin_repo_name, github_repo_name, r.Version))
+
+                if github_repo_name != '':
+                    valid = check_repo_db_for_valid(github_repo_name, r.Version, "")
+                    if valid == -1:
+                        valid = check_repo_valid(path, r.Version)
+
+                    new_path = ''
+                    if valid == 1:
+                        new_path = get_redirect_repo(github_repo_name)
+                        if new_path == '':
+                            new_path = get_new_url(path)
+                        else:
+                            replaces.append((origin_repo_name, 'github.com/' + new_path, r.Version))
+                            valid = 0
+
+                        if new_path == '':
+                            err = MessageMiss(origin_repo_name, r.Version, 1)
+                            errors.append(err)
+                        elif valid != 0:
+                            replaces.append((origin_repo_name, new_path, r.Version))
+                            valid = 0
+
+                    if valid == 2:  # TODO get last version here
+                        err = MessageMiss(origin_repo_name, r.Version, 2)
+                        errors.append(err)
+
+                    if valid != 0:
+                        valid = check_repo_db_for_valid(origin_repo_name, "", r.Revision)
+
+                        if valid == -1:
+                            valid = check_repo_valid(path, r.Revision)
+
+                        new_path = ''
+                        if valid == 1:
+                            new_path = get_redirect_repo(path.replace('github.com/', ''))
+                            if new_path == '':
+                                new_path = get_new_url(path)
+                            else:
+                                replaces.append((path, 'github.com/' + new_path, r.Revision))
+                                valid = 0
+
+                            if new_path == '':
+                                err = MessageMiss(path, r.Revision, 1)
+                                errors.append(err)
+                            elif valid != 0:
+                                replaces.append((path, new_path, r.Revision))
+                                valid = 0
+
+                        if valid == 2:
+                            err = MessageMiss(path, r.Revision, 2)
+                            errors.append(err)
+
+                        if valid == 0:
+                            requires.append(origin_repo_name + ' ' + r.Revision)
+                            continue
+                        else:
+                            continue
+
+                    use_version = get_version_type(github_repo_name, r.Version)
+                    if use_version == -11:
+                        requires.append(origin_repo_name + ' ' + r.Version)
+
+                    if use_version == -10:
+                        err = MessageMiss(origin_repo_name, r.Version, 10)
+                        requires.append(origin_repo_name + ' ' + r.Revision)
+
+                    if use_version == -1:
+                        print("It should not occur!(where major version doesn't equal to version in module path)")
+
+                    if use_version == 0:  # no go.mod in dst pkg
+                        requires.append(origin_repo_name + ' ' + r.Version + '+incompatible')
+
+                    if use_version == 1:  # has go.mod but in module path no version suffix
+                        requires.append(origin_repo_name + ' ' + r.Revision)
+
+                    if use_version >= 2:
+                        requires.append(origin_repo_name + '/' + 'v' + str(use_version) + ' ' + r.Version)
+                else:
+                    requires.append(origin_repo_name + ' ' + r.Version)
+            else:
+                if d[4] != '':
+                    github_repo_name = d[4]
+                    replaces.append((origin_repo_name, github_repo_name, r.Revision))
+                if github_repo_name != '':
+                    valid = check_repo_db_for_valid(github_repo_name, "", r.Revision)
+
+                    if valid == -1:
+                        valid = check_repo_valid(path, r.Revision)
+
+                    new_path = ''
+                    if valid == 1:
+                        new_path = get_redirect_repo(path.replace('github.com/', ''))
+                        if new_path == '':
+                            new_path = get_new_url(path)
+                        else:
+                            replaces.append((path, 'github.com/' + new_path, r.Revision))
+                            valid = 0
+
+                        if new_path == '':
+                            err = MessageMiss(path, r.Revision, 1)
+                            errors.append(err)
+                        elif valid != 0:
+                            replaces.append((path, new_path, r.Revision))
+                            valid = 0
+
+                    if valid == 2:  # TODO get latest version or hash here
+                        err = MessageMiss(path, r.Revision, 2)
+                        errors.append(err)
+
+                    if valid != 0:
+                        continue
+                    requires.append(origin_repo_name + ' ' + r.Revision)
+                else:
+                    requires.append(origin_repo_name + ' ' + r.Version)
+
+        for r in reference:
+            if r not in all_direct_r:
+                if r.Source != '':
+                    path = r.Source
+                    if r.Version != '':
+                        replaces.append((r.Path, r.Source, r.Version))
+                    else:
+                        replaces.append((r.Path, r.Source, r.Revision))
+                else:
+                    path = r.Path
+
+                if r.Version != '':
+                    requires.append(path + ' ' + r.Version)
+                elif r.Revision != '':
+                    requires.append(path + ' ' + r.Revision)
+
+        # TODO write a initial go.mod
+
+        (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod tidy')
+
+        diffs = get_diffs(reference, all_direct_r, all_direct_dep)
+
+        for dif in diffs:
+            initial = dif[0]
+            after = dif[1]
+            (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod why ' + after[0])
+            chain = out_to_list(a, b)
+            length = len(chain)
+
+            # for repo in chain:
+            #     download_a_repo(repo)
+            #     all_deps = deal_local_repo_dir()
+            #     ver = ''
+            #     for r in all_deps:
+            #         if r.Path == repo:
+            #             if r.Version != '':
+            #                 ver = r.Veriosn
+            #             else:
+            #                 ver = r.Revision
+            #
+            #     if ver ==
+
+
+
+
+
+
+
 
 
         requires = []

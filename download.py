@@ -18,21 +18,20 @@ class DOWNLOAD:
         self.save_name = ''
 
     def down_load_unzip(self):
-        cnt = 0
 
-        while os.path.isdir('temp_hm_' + str(cnt)):
-            cnt = cnt + 1
-
-        temp = 'temp_hm_' + str(cnt)
+        temp = 'pkg'
         self.dst_name = temp
 
-        os.mkdir(temp)
+        if not os.path.isdir(temp):
+            os.mkdir(temp)
 
         path = '.'
         save_name = os.path.join(path, temp)
         self.save_name = save_name
         repo_name = self.repo[0].replace('github.com/', '')
         repo_version = self.repo[1]
+        if repo_version[0] != 'v' and len(repo_version) >= 7:
+            repo_version = repo_version[0:7]
         filename = os.path.join(temp, repo_name.replace('/', '=') + '@' + repo_version)  # kiali=kiali@v1.0.0
         # judge dir exit or not
         # check_result = os.path.exists(os.path.join(path, filename))
@@ -58,8 +57,9 @@ class DOWNLOAD:
                 unzip_name = filename + '.zip'
                 # print(os.path.join(path, unzip_name))
                 unzip = zipfile.ZipFile(os.path.join(path, unzip_name), 'r')
-                unzip.extractall(os.path.join(save_name, '1'))
+                unzip.extractall(save_name)
                 unzip.close()
+                os.remove(os.path.join(path, unzip_name))
                 # print('Unzip successfully')
                 # old_name = os.listdir(os.path.join(save_name, '1'))[0]
                 # os.remove(os.path.join(path, unzip_name))  # delete the zip

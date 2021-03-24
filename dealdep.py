@@ -535,20 +535,29 @@ def get_all_direct_dep(import_list, tool_dep_list):
     #                     repo_list.append([now_name, repo_name, siv_path, 1])
 
     direct_dep_list = []
+    direct_r_list = []
     for imp in import_list:
         (repo_name, siv_path) = get_repo_name(imp)
         ver = ''
+        r_back = None
+        repo_name_1 = ''
         for r in tool_dep_list:
             if r.Path == imp:
+                if r.Source != '':
+                    (repo_name_1, siv_path_1) = get_repo_name(r.Source)
+                r_back = r
                 if r.Version != '':
                     ver = r.Version
                 else:
                     ver = r.Revision
+                break
 
         if ver != '':
-            direct_dep_list.append([repo_name, ver, imp, siv_path])
+            direct_r_list.append(r_back)
+            direct_dep_list.append([repo_name, ver, imp, siv_path, repo_name_1])
 
-    return direct_dep_list
+
+    return direct_r_list, direct_dep_list
 
 
 def deal_local_repo_dir(repo_id, tag, references):
@@ -577,8 +586,8 @@ def deal_local_repo_dir(repo_id, tag, references):
 
     if tag == 1:
         (import_list, self_ref) = deal_go_files(go_list, repo_url, go_mod_module)
-        direct_repo_list = get_all_direct_dep(import_list, references)
-        return direct_repo_list
+        (direct_r_list, direct_repo_list) = get_all_direct_dep(import_list, references)
+        return direct_r_list, direct_repo_list
     else:
         if mod_list:
             (mod_dep_list, mod_rep_list, go_mod_module) = l_deal_mod(mod_list, repo_url, repo_name)
