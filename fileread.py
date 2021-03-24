@@ -300,9 +300,10 @@ def read_in_file(pathname, file_type_descriptor):
         f = open(path)
         data = f.read()
         reference = parse_gopkg_lock(file_type_descriptor, data)
-        repo_id = re.findall(r'/.+?$', pathname)
+        repo_id = re.findall(r'/(.+?)$', pathname)
 
         all_direct_dep = deal_local_repo_dir(repo_id, 1, reference)
+
 
         requires = []
         for r in reference:

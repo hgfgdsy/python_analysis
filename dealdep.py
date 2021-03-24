@@ -432,7 +432,7 @@ def get_github_name(dep_name):
 
 
 def return_repo_name(dep_name):
-    dep_name = 'github.com' + dep_name.replace('github.com/', '')
+    dep_name = 'github.com/' + dep_name.replace('github.com/', '')
     repo_name = get_git_repo_name(dep_name)
     return repo_name
 
