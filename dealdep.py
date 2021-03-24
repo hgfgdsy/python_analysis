@@ -2,6 +2,53 @@ import os
 import re
 
 import chardet
+import pymysql
+
+from fileread import get_db_search, get_db_insert
+
+from dep import parse_gopkg_lock
+from glide import parse_glide_lock
+from godeps import parse_godeps_json
+from glock import parse_glockfile
+from tsv import parse_dependencies_tsv
+from vconf import parse_vendor_conf
+from vyml import parse_vendor_yml
+from vjson import parse_vendor_json
+from vmanifest import parse_vendor_manifest
+
+
+def get_tool_dic(tool_list):
+    dic = {1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '', 9: ''}
+    for t in tool_list:
+        t = t[1:]
+        if t == 'Gopkg.lock':
+            dic[1] = t
+
+        if t == 'glide.lock':
+            dic[2] = t
+
+        if t == 'Godeps/Godeps.json':
+            dic[3] = t
+
+        if t == 'GLOCKFILE':
+            dic[4] = t
+
+        if t == 'dependencies.tsv':
+            dic[5] = t
+
+        if t == 'vendor.conf':
+            dic[6] = t
+
+        if t == 'vendor.yml':
+            dic[7] = t
+
+        if t == 'vendor/vendor.json':
+            dic[8] = t
+
+        if t == 'vendor/vendor.manifest':
+            dic[9] = t
+
+    return dic
 
 
 def get_tool_name_list():
@@ -12,6 +59,53 @@ def get_tool_name_list():
 def get_tool_name_list_2():
     tool_name_list = ['glide.lock', 'Gopkg.lock']
     return tool_name_list
+
+
+def check_repo_red_del(old_repo):
+    # repo_name_update
+    check_db_name = 'repo_name_update'
+    (host, user, password, db_name) = get_db_search()
+    sql = "SELECT now_repo_name FROM " + check_db_name + " WHERE old_repo_name='%s'" % old_repo
+    db_check = pymysql.connect(host, user, password, db_name)
+    try:
+        check_cursor = db_check.cursor()
+        check_cursor.execute(sql)
+        check_result = check_cursor.fetchall()
+        check_cursor.close()
+        db_check.close()
+        if check_result:
+            return check_result[0][0]
+        else:
+            return ''
+    except Exception as exp:
+        print("get redirected repo name from ", check_db_name, " error",
+              exp, '%%%%%%%%%%%%%%%%%%%%%%%%')
+        print(sql)
+        return ''
+
+
+def get_new_url(old_url):
+    # new_web_name
+    check_db_name = 'new_web_name'
+    (host, user, password, db_name) = get_db_search()
+    sql = "SELECT now_url FROM " + check_db_name + " WHERE old_url='%s' or " \
+                                                   "old_url='%s'" % (old_url, 'github.com/' + old_url)
+    db_check = pymysql.connect(host, user, password, db_name)
+    try:
+        check_cursor = db_check.cursor()
+        check_cursor.execute(sql)
+        check_result = check_cursor.fetchall()
+        check_cursor.close()
+        db_check.close()
+        if check_result:
+            return check_result[0][0]
+        else:
+            return ''
+    except Exception as exp:
+        print("2. get new url from ", check_db_name, " error",
+              exp, '%%%%%%%%%%%%%')
+        print(sql)
+        return ''
 
 
 def deal_dep_version(dep_version):
@@ -186,8 +280,59 @@ def deal_local_repo(root_url, local_url, go_list, mod_list, tool_list):
 
 
 def l_deal_tool(tool_list, repo_url, repo_name):
+    references = []
+    rpaths = []
+    for tool in tool_list:
+        tool = tool[1:]
+        path = os.path.join(repo_url, tool)
+        f = open(path)
+        data = f.read()
+        refs = []
+        if tool == 'Gopkg.lock':
+            refs = parse_gopkg_lock(-1, data)
 
-    return []
+        if tool == 'glide.lock':
+            refs = parse_glide_lock(-1, data)
+
+        if tool == 'Godeps/Godeps.json':
+            refs = parse_godeps_json(-1, data)
+
+        if tool == 'GLOCKFILE':
+            refs = parse_glockfile(-1, data)
+
+        if tool == 'dependencies.tsv':
+            refs = parse_dependencies_tsv(-1, data)
+
+        if tool == 'vendor.conf':
+            refs = parse_vendor_conf(-1, data)
+
+        if tool == 'vendor.yml':
+            refs = parse_vendor_yml(-1, data)
+
+        if tool == 'vendor/vendor.json':
+            refs = parse_vendor_json(-1, data)
+
+        if tool == 'vendor/vendor.manifest':
+            refs = parse_vendor_manifest(-1, data)
+
+        if not references:
+            for r in refs:
+                if r.Path != '':
+                    rpaths.append(r.Path)
+                    references.append(r)
+        else:
+            for r in refs:
+                if r.Path != '' and r.Path not in rpaths:
+                    rpaths.append(r.Path)
+                    references.append(r)
+
+    tool_dep_list = []
+    for r in references:
+        if r.Version != '':
+            tool_dep_list.append([r.Path, r.Version])
+        else:
+            tool_dep_list.append([r.Path, r.Revision])
+    return tool_dep_list
 
 
 def get_requires_from_file(file_url, import_list):
@@ -238,13 +383,175 @@ def deal_go_files(go_list, repo_url, go_mod_module):
     return import_list, self_ref
 
 
-def get_all_direct_depmod(import_list, mod_dep_list):
+def get_github_name_db(spec_name):
+    (host, user, password, db_name) = get_db_search()
+    sql = "SELECT old_url FROM new_web_name WHERE now_url='%s'" % spec_name
+    db_check = pymysql.connect(host, user, password, db_name)
+    try:
+        check_cursor = db_check.cursor()
+        check_cursor.execute(sql)
+        check_result = check_cursor.fetchall()
+        check_cursor.close()
+        db_check.close()
+        if check_result:
+            # print('This special url have related github url：', check_result[0][0])
+            return 1, check_result[0][0]
+        else:
+            return 0, ''
+    except Exception as exp:
+        print("1. check new_web_name error:", exp, '-------------------------------------------------------------')
+        print(sql)
+        return -1, ''
+
+
+def get_github_name(dep_name):
+    siv_path = ''
+    git_mod_name = ''
+    repo_name = ''
+    if re.findall(r"^(gopkg.in/.+?)\.v\d", dep_name):
+        # gopkg.in/cheggaaa/pb.v1
+        repo_name = re.findall(r"^(gopkg.in/.+?)\.v\d", dep_name)[0]
+    siv_path = get_imp_siv_path(dep_name)
+    nosiv_path = dep_name.replace(siv_path, '')
+    if repo_name:
+        (r, git_name) = get_github_name_db(repo_name)
+        if git_name:
+            git_mod_name = git_name
+    else:
+        if re.findall(r"^([^/]+?/[^/]+?)$", nosiv_path):
+            repo_name = re.findall(r"^([^/]+?/[^/]+?)$", nosiv_path)[0]
+        elif re.findall(r"^([^/]+?/[^/]+?)/", nosiv_path):
+            repo_name = re.findall(r"^([^/]+?/[^/]+?)/", nosiv_path)[0]
+        else:
+            repo_name = nosiv_path
+        (r, git_name) = get_github_name_db(repo_name)
+
+        if git_name:
+            git_mod_name = git_name
+    return git_mod_name
+
+
+def return_repo_name(dep_name):
+    dep_name = 'github.com' + dep_name.replace('github.com/', '')
+    repo_name = get_git_repo_name(dep_name)
+    return repo_name
+
+
+def get_git_repo_name(dep):
+    repo_name = ''
+    if re.findall(r"^github.com/([^/]+?/[^/]+?)$", dep):
+        repo_name = re.findall(r"^github.com/([^/]+?/[^/]+?)$", dep)[0]
+    elif re.findall(r"^github.com/([^/]+?/[^/]+?)/", dep):
+        repo_name = re.findall(r"^github.com/([^/]+?/[^/]+?)/", dep)[0]
+    return repo_name
+
+
+def get_imp_siv_path(dep_name):
+    siv_path = ''
+    if re.findall(r"(/v\d+?)$", dep_name):
+        siv_path = re.findall(r"(/v\d+?)$", dep_name)[0]
+    elif re.findall(r"(\.v\d+?)$", dep_name):
+        siv_path = re.findall(r"(\.v\d+?)$", dep_name)[0]
+    elif re.findall(r"(/v\d+?)/", dep_name):
+        siv_path = re.findall(r"(/v\d+?)/", dep_name)[0]
+    elif re.findall(r"(\.v\d+?)/", dep_name):
+        siv_path = re.findall(r"(\.v\d+?)/", dep_name)[0]
+    return siv_path
+
+
+def get_repo_name(dep_name):
+    repo_name = ''
+    siv_path = get_imp_siv_path(dep_name)
+    if re.findall(r"^github.com/", dep_name):
+        repo_name = get_git_repo_name(dep_name)
+    elif re.findall(r"^go.etcd.io/", dep_name):
+        repo_name = dep_name.replace('go.etcd.io/', 'etcd-io/')
+        if repo_name != dep_name:
+            repo_name = return_repo_name(repo_name)
+        else:
+            git_name = get_github_name(dep_name)
+            # gopkg.in/alecthomas/gometalinter.v2   golang.org/x/sync
+            if git_name:
+                repo_name = git_name
+    elif re.findall(r"^golang.org/x/", dep_name):
+        repo_name = dep_name.replace('golang.org/x/', 'golang/')
+        if repo_name != dep_name:
+            repo_name = return_repo_name(repo_name)
+        else:
+            git_name = get_github_name(dep_name)
+            # gopkg.in/alecthomas/gometalinter.v2   golang.org/x/sync
+            if git_name:
+                repo_name = git_name
+    elif re.findall(r"^gopkg\.in/", dep_name):
+        if re.findall(r"^gopkg\.in/([^/]+?/[^/]+?)\.v\d", dep_name):
+            repo_name = re.findall(r"^gopkg\.in/([^/]+?/[^/]+?)\.v\d", dep_name)[0]
+        else:
+            if re.findall(r"^gopkg\.in/([^/]+?/[^/]+?)\.", dep_name):
+                repo_name = re.findall(r"^gopkg\.in/([^/]+?/[^/]+?)\.", dep_name)[0]
+            else:
+                if re.findall(r"^gopkg\.in/([^/]+?/[^/]+?)/", dep_name):
+                    repo_name = re.findall(r"^gopkg\.in/([^/]+?/[^/]+?)/", dep_name)[0]
+                else:
+                    git_name = get_github_name(dep_name)
+                    # gopkg.in/alecthomas/gometalinter.v2   golang.org/x/sync
+                    if git_name:
+                        repo_name = git_name
+    else:
+        git_name = get_github_name(dep_name)
+        # gopkg.in/alecthomas/gometalinter.v2   golang.org/x/sync
+        if git_name:
+            repo_name = git_name
+
+    repo_name = repo_name.replace('github.com/', '')
+    return repo_name, siv_path
+
+
+def get_all_direct_dep(import_list, tool_dep_list):
     search_e = 0
+    repo_list = []
+    # dep_list = []
+    direct_repo_list = []
+    # siv_path = ''
+    # for imp in import_list:
+    #     (repo_name, siv_path) = get_repo_name(imp)
+    #     if repo_name:
+    #         if not re.findall(r"^github.com/", imp):
+    #             web_name = get_new_url('github.com/' + repo_name)
+    #             if [repo_name, web_name, siv_path, 0] not in repo_list:
+    #                 repo_list.append([repo_name, web_name, siv_path, 0])
+    #             # if web_name:
+    #             #     if web_name not in dep_list:
+    #             #         dep_list.append(web_name)
+    #             # else:
+    #             #     dep_list.append(repo_name)
+    #         else:
+    #             now_name = check_repo_red_del(repo_name)
+    #             if not now_name and now_name != '0':
+    #                 if [repo_name, '', siv_path, 0] not in repo_list:
+    #                     repo_list.append([repo_name, '', siv_path, 0])
+    #                     # print('get_all_direct_dep方法:', [repo_name, ''])
+    #             else:
+    #                 if [now_name, repo_name, siv_path, 1] not in repo_list:
+    #                     repo_list.append([now_name, repo_name, siv_path, 1])
 
     direct_dep_list = []
+    for imp in import_list:
+        (repo_name, siv_path) = get_repo_name(imp)
+        ver = ''
+        for r in tool_dep_list:
+            if r.Path == imp:
+                if r.Version != '':
+                    ver = r.Version
+                else:
+                    ver = r.Revision
+
+        if ver != '':
+            direct_dep_list.append([repo_name, ver, imp, siv_path])
+
+    return direct_dep_list
 
 
-def deal_local_repo_dir(repo_id, repo_name, repo_version):
+def deal_local_repo_dir(repo_id, tag, references):
     go_list = []
     mod_list = []
     tool_list = []
@@ -257,119 +564,24 @@ def deal_local_repo_dir(repo_id, repo_name, repo_version):
     mod_num = len(mod_list)
     tool_num = len(tool_list)
 
-    mod_dep_list = []
-    tool_dep_list = []
-    mod_rep_list = []
-    go_mod_module = ''
-
-    if mod_list:
-        (mod_dep_list, mod_rep_list, go_mod_module) = l_deal_mod(mod_list, repo_url, repo_name)
-
-    if tool_list:
-        tool_dep_list = l_deal_tool(tool_list, repo_url, repo_name)
-
-    (import_list, self_ref) = deal_go_files(go_list, repo_url, go_mod_module)
-
-    if mod_dep_list and (mod_list[0] == '/' or mod_list == 0):  # '/'就说明是根目录的go.mod文件
-        direct_repo_list = get_all_direct_depmod(import_list, mod_dep_list)
-    else:
-        direct_repo_list = get_all_direct_dep(import_list, tool_dep_list)
-
-
-def deal_local_repo_dir_fork():
-    go_list = []
-    mod_list = []
-    tool_list = []
-    vendor_list = []
-    deal_repo_path = './repos/deps/2'
-    if not os.path.exists(deal_repo_path):
-        os.makedirs(deal_repo_path)
-        os.makedirs(mod_dir_name)
-        os.makedirs(tool_dir_name)
-
-    # 该调用第二个参数是否不对 bug？
-    (go_list, mod_list, tool_list, vendor_list) = deal_local_repo(repo_url, repo_url, go_list, mod_list, tool_list,
-                                                                  vendor_list)
-    mod_num = len(mod_list)  # $mod_num=2$
-    tool_num = len(tool_list)  # $tool_num=3$
-    if mod_num > 0:
-        mod_list.sort(key=lambda m: len(m), reverse=False)
-    if tool_num > 0:
-        tool_list.sort(key=lambda t: len(t), reverse=False)
     repo_name = ''
     if re.findall(r"/([^/]+?)@+?$", repo_url):  # 是否应该是/([^/]+?)@.+?$ bug?
         repo_name = re.findall(r"/([^/]+?)@+?$", repo_url)[0].replace('=', '/')
     elif re.findall(r"\\([^\\]+?)@.+?$", repo_url):
         repo_name = re.findall(r"\\([^\\]+?)@.+?$", repo_url)[0].replace('=', '/')
-    go_mod_module = ''
+
     mod_dep_list = []
-    l_mod_list = []
-    l_tool_list = []
-    if mod_list:
-        (mod_dep_list, l_mod_list, go_mod_module) = l_deal_mod(mod_list, repo_url, mod_dir_name, repo_name)
-    if tool_list:
-        l_tool_list = l_deal_tool(tool_list, repo_url, tool_dir_name)
+    tool_dep_list = []
+    mod_rep_list = []
+    go_mod_module = ''
 
-    if not go_mod_module and repo_name:
-        go_mod_module = 'github.com/' + repo_name
-    (import_list, self_ref) = deal_go_files(go_list, repo_url, go_mod_module)
-
-    if mod_dep_list and (mod_list[0] == '/' or mod_list == 0):  # '/'就说明是根目录的go.mod文件
-        direct_repo_list = get_all_direct_depmod(import_list, mod_dep_list)
+    if tag == 1:
+        (import_list, self_ref) = deal_go_files(go_list, repo_url, go_mod_module)
+        direct_repo_list = get_all_direct_dep(import_list, references)
+        return direct_repo_list
     else:
-        direct_repo_list = get_all_direct_dep(import_list)
-    delete_list = []
-    this_repo_name = repo_id.split('@')[0].replace('=', '/')
-    for dep in direct_repo_list:
-        if dep[0] == this_repo_name:
-            self_ref = self_ref + 1
-            delete_list.append(dep)
+        if mod_list:
+            (mod_dep_list, mod_rep_list, go_mod_module) = l_deal_mod(mod_list, repo_url, repo_name)
 
-    for d in delete_list:
-        direct_repo_list.remove(d)
-    # 写入文件：
-    # $mod_num=2$   $tool_num=3$
-    # vendor_list
-    # l_mod_list  l_tool_list
-    # self_ref
-    # go_mod_module
-    # direct_repo_list
-    if not mod_list:
-        go_mod_module = ''
-    file_str = '$mod_num=' + str(mod_num) + '$tool_num=' + str(tool_num) + '$self_ref=' + str(self_ref) + '$'
-    if go_mod_module:
-        file_str = file_str + '*go_mod_module=' + go_mod_module + '*'
-    vendor_str = '$vendor:'
-    for v in vendor_list:
-        vendor_str = vendor_str + v + ';'
-    file_str = file_str + vendor_str + '$'
-    mod_str = '$go.mod:'
-    for lm in l_mod_list:
-        mod_str = mod_str + lm + ';'
-    file_str = file_str + mod_str + '$'
-    tool_str = '$tool:'
-    for lt in l_tool_list:
-        tool_str = tool_str + lt + ';'
-    file_str = file_str + tool_str + '$'
-    direct_dep_str = '$direct_dep:'
-    for d in direct_repo_list:
-        d_str = '['
-        for d_s in d:
-            if isinstance(d_s, int):
-                d_str = d_str + str(d_s) + ','
-            else:
-                d_str = d_str + d_s + ','
-        d_str = d_str.strip(',') + ']'
-        direct_dep_str = direct_dep_str + d_str + ';'
-    file_str = file_str + direct_dep_str + '$'
-
-    file = open(file_name, 'w')
-    file.write(file_str)  # msg也就是下面的Hello world!
-    file.close()
-    # nd_path = deal_path
-    nd_path_2 = os.path.join(nd_path, '@').strip('@')
-    if re.findall(r"^" + nd_path + "$", repo_url) \
-            or re.findall(r"^" + nd_path_2, repo_url):
-        print('+++++++++++++++++++++++++++++++cannot delete: ', repo_url)
-    else:
-        shutil.rmtree(repo_url)
+        if tool_list:
+            tool_dep_list = l_deal_tool(tool_list, repo_url, repo_name)
