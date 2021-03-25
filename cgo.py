@@ -11,7 +11,7 @@ def get_go_version():
     return vs
 
 
-def write_go_mod(requires):
+def write_go_mod(requires, replaces, reqlist):
 
     module_path = get_module_path()
 
@@ -25,6 +25,13 @@ def write_go_mod(requires):
         msg = msg + r + '\n'
 
     msg = msg + ')\n'
+
+    msg = msg + '\n'
+    msg = msg + 'replace (' + '\n'
+    for r in replaces:
+        msg = msg + r[0] + ' ' + r[2] + ' => ' + r[1] + ' ' + r[2] + '\n'
+    msg = msg + ')\n'
+    print(msg)
 
     f = open('go.mod', 'w')
     f.write(msg)

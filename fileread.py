@@ -10,7 +10,7 @@ import json
 import random
 import pymysql
 
-from dealdep import deal_local_repo_dir
+from dealdep import deal_local_repo_dir, get_db_search, get_db_insert
 
 from missing import *
 import os
@@ -18,22 +18,6 @@ import os
 import subprocess
 
 from tool.repo import check_insert_mes, get_down_repo_msg, get_repo_now_name
-
-
-def get_db_search():
-    host = '47.88.48.19'
-    user = 'root'
-    password = 'Ella1996'
-    db_name = 'githubspider'
-    return host, user, password, db_name
-
-
-def get_db_insert():  # downDep 中有重复
-    host = '47.88.48.19'
-    user = 'root'
-    password = 'Ella1996'
-    db_name = 'hero-tool'
-    return host, user, password, db_name
 
 
 def get_results(url, headers):
@@ -314,9 +298,10 @@ def read_in_file(pathname, file_type_descriptor):
         f = open(path)
         data = f.read()
         reference = parse_gopkg_lock(file_type_descriptor, data)
-        repo_id = re.findall(r'/(.+?)$', pathname)
+        repo_id = re.findall(r'/([^/]+?)$', pathname)[0]
 
         requires = []
+        reqlist = []
 
         (all_direct_r, all_direct_dep) = deal_local_repo_dir(repo_id, 1, reference)
         count = 0
@@ -325,11 +310,15 @@ def read_in_file(pathname, file_type_descriptor):
             count = count + 1
             origin_repo_name = d[2]
             github_repo_name = d[0]
-            path = 'github.com/' + github_repo_name
             if r.Version != '':
                 if d[4] != '':
                     github_repo_name = d[4]
-                    replaces.append((origin_repo_name, github_repo_name, r.Version))
+                    replaces.append((origin_repo_name, r.Source, r.Version))
+                    requires.append(origin_repo_name + ' ' + r.Version)
+                    reqlist.append([origin_repo_name, r.Version])
+                    continue
+
+                path = 'github.com/' + github_repo_name
 
                 if github_repo_name != '':
                     valid = check_repo_db_for_valid(github_repo_name, r.Version, "")
@@ -364,18 +353,18 @@ def read_in_file(pathname, file_type_descriptor):
 
                         new_path = ''
                         if valid == 1:
-                            new_path = get_redirect_repo(path.replace('github.com/', ''))
+                            new_path = get_redirect_repo(github_repo_name)
                             if new_path == '':
                                 new_path = get_new_url(path)
                             else:
-                                replaces.append((path, 'github.com/' + new_path, r.Revision))
+                                replaces.append((origin_repo_name, 'github.com/' + new_path, r.Revision))
                                 valid = 0
 
                             if new_path == '':
-                                err = MessageMiss(path, r.Revision, 1)
+                                err = MessageMiss(origin_repo_name, r.Revision, 1)
                                 errors.append(err)
                             elif valid != 0:
-                                replaces.append((path, new_path, r.Revision))
+                                replaces.append((origin_repo_name, new_path, r.Revision))
                                 valid = 0
 
                         if valid == 2:
@@ -384,6 +373,7 @@ def read_in_file(pathname, file_type_descriptor):
 
                         if valid == 0:
                             requires.append(origin_repo_name + ' ' + r.Revision)
+                            reqlist.append([origin_repo_name, r.Revision])
                             continue
                         else:
                             continue
@@ -391,28 +381,45 @@ def read_in_file(pathname, file_type_descriptor):
                     use_version = get_version_type(github_repo_name, r.Version)
                     if use_version == -11:
                         requires.append(origin_repo_name + ' ' + r.Version)
+                        reqlist.append([origin_repo_name, r.Version])
 
                     if use_version == -10:
                         err = MessageMiss(origin_repo_name, r.Version, 10)
                         requires.append(origin_repo_name + ' ' + r.Revision)
+                        reqlist.append([origin_repo_name, r.Revision])
 
                     if use_version == -1:
                         print("It should not occur!(where major version doesn't equal to version in module path)")
 
                     if use_version == 0:  # no go.mod in dst pkg
                         requires.append(origin_repo_name + ' ' + r.Version + '+incompatible')
+                        reqlist.append([origin_repo_name, r.Version])
 
                     if use_version == 1:  # has go.mod but in module path no version suffix
-                        requires.append(origin_repo_name + ' ' + r.Revision)
+                        i = re.findall(r'gopkg.in/')
+                        if not i:
+                            requires.append(origin_repo_name + ' ' + r.Revision)
+                            reqlist.append([origin_repo_name, r.Revision])
+                        else:
+                            requires.append(origin_repo_name + ' ' + r.Version)
+                            reqlist.append([origin_repo_name, r.Version])
 
                     if use_version >= 2:
                         requires.append(origin_repo_name + '/' + 'v' + str(use_version) + ' ' + r.Version)
+                        reqlist.append([origin_repo_name, r.Version])
                 else:
                     requires.append(origin_repo_name + ' ' + r.Version)
+                    reqlist.append([origin_repo_name, r.Version])
             else:
                 if d[4] != '':
                     github_repo_name = d[4]
-                    replaces.append((origin_repo_name, github_repo_name, r.Revision))
+                    replaces.append((origin_repo_name, r.Source, r.Revision))
+                    requires.append(origin_repo_name + ' ' + r.Revision)
+                    reqlist.append([origin_repo_name, r.Revision])
+                    continue
+
+                path = 'github.com/' + github_repo_name
+
                 if github_repo_name != '':
                     valid = check_repo_db_for_valid(github_repo_name, "", r.Revision)
 
@@ -421,29 +428,31 @@ def read_in_file(pathname, file_type_descriptor):
 
                     new_path = ''
                     if valid == 1:
-                        new_path = get_redirect_repo(path.replace('github.com/', ''))
+                        new_path = get_redirect_repo(github_repo_name)
                         if new_path == '':
                             new_path = get_new_url(path)
                         else:
-                            replaces.append((path, 'github.com/' + new_path, r.Revision))
+                            replaces.append((origin_repo_name, 'github.com/' + new_path, r.Revision))
                             valid = 0
 
                         if new_path == '':
-                            err = MessageMiss(path, r.Revision, 1)
+                            err = MessageMiss(origin_repo_name, r.Revision, 1)
                             errors.append(err)
                         elif valid != 0:
-                            replaces.append((path, new_path, r.Revision))
+                            replaces.append((origin_repo_name, new_path, r.Revision))
                             valid = 0
 
                     if valid == 2:  # TODO get latest version or hash here
-                        err = MessageMiss(path, r.Revision, 2)
+                        err = MessageMiss(origin_repo_name, r.Revision, 2)
                         errors.append(err)
 
                     if valid != 0:
                         continue
                     requires.append(origin_repo_name + ' ' + r.Revision)
+                    reqlist.append([origin_repo_name, r.Revision])
                 else:
-                    requires.append(origin_repo_name + ' ' + r.Version)
+                    requires.append(origin_repo_name + ' ' + r.Revision)
+                    reqlist.append([origin_repo_name, r.Revision])
 
         for r in reference:
             if r not in all_direct_r:
@@ -458,21 +467,25 @@ def read_in_file(pathname, file_type_descriptor):
 
                 if r.Version != '':
                     requires.append(path + ' ' + r.Version)
+                    reqlist.append([path, r.Version])
                 elif r.Revision != '':
                     requires.append(path + ' ' + r.Revision)
+                    reqlist.append([path, r.Revision])
 
         # TODO write a initial go.mod
+        write_go_mod(requires, replaces, reqlist)
 
-        (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod tidy')
 
-        diffs = get_diffs(reference, all_direct_r, all_direct_dep)
-
-        for dif in diffs:
-            initial = dif[0]
-            after = dif[1]
-            (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod why ' + after[0])
-            chain = out_to_list(a, b)
-            length = len(chain)
+        # (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod tidy')
+        #
+        # diffs = get_diffs(reference, all_direct_r, all_direct_dep)
+        #
+        # for dif in diffs:
+        #     initial = dif[0]
+        #     after = dif[1]
+        #     (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod why ' + after[0])
+        #     chain = out_to_list(a, b)
+        #     length = len(chain)
 
             # for repo in chain:
             #     download_a_repo(repo)
@@ -494,22 +507,22 @@ def read_in_file(pathname, file_type_descriptor):
 
 
 
-
-        requires = []
-        for r in reference:
-            if r.Path == "" or (r.Version == "" and r.Revision == ""):
-                print("wrong reference!")
-            else:
-                if r.Source != "":  # source should be replace
-                    path = r.Source
-                    if r.Version == "":
-                        replaces.append((r.Path, r.Source, r.Revision))
-                    else:
-                        replaces.append((r.Path, r.Source, r.Version))
-                else:
-                    path = r.Path
-
-                all_direct_dep = deal_local_repo_dir()
+        #
+        # requires = []
+        # for r in reference:
+        #     if r.Path == "" or (r.Version == "" and r.Revision == ""):
+        #         print("wrong reference!")
+        #     else:
+        #         if r.Source != "":  # source should be replace
+        #             path = r.Source
+        #             if r.Version == "":
+        #                 replaces.append((r.Path, r.Source, r.Revision))
+        #             else:
+        #                 replaces.append((r.Path, r.Source, r.Version))
+        #         else:
+        #             path = r.Path
+        #
+        #         all_direct_dep = deal_local_repo_dir()
         #         if not re.findall(r'^github.com/', path):  # TODO(download/check pkgs from other sources)
         #             if r.Version != "":
         #                 requires.append(path + ' ' + r.Version)

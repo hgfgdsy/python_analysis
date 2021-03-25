@@ -19,7 +19,7 @@ class DOWNLOAD:
 
     def down_load_unzip(self):
 
-        temp = 'pkg'
+        temp = 'pkg1'
         self.dst_name = temp
 
         if not os.path.isdir(temp):
@@ -30,8 +30,6 @@ class DOWNLOAD:
         self.save_name = save_name
         repo_name = self.repo[0].replace('github.com/', '')
         repo_version = self.repo[1]
-        if repo_version[0] != 'v' and len(repo_version) >= 7:
-            repo_version = repo_version[0:7]
         filename = os.path.join(temp, repo_name.replace('/', '=') + '@' + repo_version)  # kiali=kiali@v1.0.0
         # judge dir exit or not
         # check_result = os.path.exists(os.path.join(path, filename))
@@ -57,13 +55,13 @@ class DOWNLOAD:
                 unzip_name = filename + '.zip'
                 # print(os.path.join(path, unzip_name))
                 unzip = zipfile.ZipFile(os.path.join(path, unzip_name), 'r')
-                unzip.extractall(save_name)
+                unzip.extractall(os.path.join(save_name, '1'))
                 unzip.close()
                 os.remove(os.path.join(path, unzip_name))
                 # print('Unzip successfully')
-                # old_name = os.listdir(os.path.join(save_name, '1'))[0]
+                old_name = os.listdir(os.path.join(save_name, '1'))[0]
                 # os.remove(os.path.join(path, unzip_name))  # delete the zip
-                # os.rename(os.path.join(os.path.join(save_name, '1'), old_name), os.path.join(path, filename))
+                os.rename(os.path.join(os.path.join(save_name, '1'), old_name), os.path.join(path, filename))
                 self.download_result = 1
             except Exception as exp:
                 self.download_result = -1

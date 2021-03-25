@@ -4,8 +4,6 @@ import re
 import chardet
 import pymysql
 
-from fileread import get_db_search, get_db_insert
-
 from dep import parse_gopkg_lock
 from glide import parse_glide_lock
 from godeps import parse_godeps_json
@@ -15,6 +13,22 @@ from vconf import parse_vendor_conf
 from vyml import parse_vendor_yml
 from vjson import parse_vendor_json
 from vmanifest import parse_vendor_manifest
+
+
+def get_db_search():
+    host = '47.88.48.19'
+    user = 'root'
+    password = 'Ella1996'
+    db_name = 'githubspider'
+    return host, user, password, db_name
+
+
+def get_db_insert():  # downDep 中有重复
+    host = '47.88.48.19'
+    user = 'root'
+    password = 'Ella1996'
+    db_name = 'hero-tool'
+    return host, user, password, db_name
 
 
 def get_tool_dic(tool_list):
@@ -537,6 +551,10 @@ def get_all_direct_dep(import_list, tool_dep_list):
     direct_dep_list = []
     direct_r_list = []
     for imp in import_list:
+        domain = re.findall(r'^.+?/', imp)[0]
+        i = domain.find('.')
+        if i < 0:
+            continue
         (repo_name, siv_path) = get_repo_name(imp)
         ver = ''
         r_back = None
@@ -556,7 +574,6 @@ def get_all_direct_dep(import_list, tool_dep_list):
             direct_r_list.append(r_back)
             direct_dep_list.append([repo_name, ver, imp, siv_path, repo_name_1])
 
-
     return direct_r_list, direct_dep_list
 
 
@@ -564,8 +581,10 @@ def deal_local_repo_dir(repo_id, tag, references):
     go_list = []
     mod_list = []
     tool_list = []
-
-    nd_path = os.path.join('.', 'pkg')
+    if tag == 1:
+        nd_path = os.path.join('.', 'pkg')
+    else:
+        nd_path = os.path.join('.', 'pkg1')
     repo_url = os.path.join(nd_path, repo_id)
 
     (go_list, mod_list, tool_list) = deal_local_repo(repo_url, repo_url, go_list, mod_list, tool_list)

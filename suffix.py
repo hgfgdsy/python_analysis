@@ -52,6 +52,19 @@ def get_version_type(name, version):
     if int(major) < 2:
         return -11
 
+    if version[0] != 'v' and len(version) >= 7:
+        version = version[0:7]
+    pkg_name = name.replace('/', '=') + '@' + version
+
+    if os.path.isdir('./pkg1/' + pkg_name):
+        r_type = get_local_pkg('./pkg1/' + pkg_name)
+        if r_type < 2:
+            return r_type
+        if r_type != int(major):
+            return -1
+        else:
+            return r_type
+
     get_dep = DOWNLOAD([name, version])
     get_dep.down_load_unzip()
     download_result = get_dep.download_result
@@ -65,12 +78,13 @@ def get_version_type(name, version):
             break
 
     if download_result != -1:
-        pkg_name = os.listdir(os.path.join(get_dep.save_name, '1'))[0]
-        pkg_path = os.path.join(os.path.join(os.path.join(get_dep.save_name, '1'), pkg_name))
+        # pkg_name = os.listdir(os.path.join(get_dep.save_name, '1'))[0]
+        pkg_name = name.replace('/', '=') + '@' + version
+        pkg_path = os.path.join(os.path.join(get_dep.save_name, pkg_name))
         r_type = get_local_pkg(pkg_path)
     else:
         r_type = -10
-    shutil.rmtree(get_dep.dst_name)
+    # shutil.rmtree(get_dep.dst_name)
     if r_type < 2:
         return r_type
     if r_type != int(major):
