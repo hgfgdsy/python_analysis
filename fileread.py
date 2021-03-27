@@ -17,7 +17,8 @@ import os
 
 import subprocess
 
-from tool.repo import check_insert_mes, get_down_repo_msg, get_repo_now_name
+from dealdep import get_mod_require, deal_dep_version, get_repo_name
+from download import *
 
 
 def get_results(url, headers):
@@ -278,16 +279,75 @@ def get_new_url(old_url):
         return ''
 
 
-def get_diffs(reference, all_direct_r, all_direct_dep):
-    return []
+def get_diffs(reqlist, all_direct_r, all_direct_dep):
+    requires = []
+    replaces = []
+    mod_dep_list = []
+    diffs = []
+    (requires, replaces) = get_mod_require('./pkg/hgfgdsy=migtry@v0.0.0/.go.mod', requires, replaces)
+
+    for m in requires:
+        dep = m.replace('+replace', '').replace('// indirect', '').strip().split(' ')
+        if len(dep) > 1:
+            dep_version = deal_dep_version(dep[1])
+            if re.findall(r"\+replace", m) and dep:
+                mod_dep_list.append([dep[0], dep_version, 3])  # replace
+            elif re.findall(r"// indirect", m) and dep:
+                mod_dep_list.append([dep[0], dep_version, 2])  # dep from old repo
+            elif dep:
+                mod_dep_list.append([dep[0], dep_version, 1])  # normal
+
+    for d in mod_dep_list:
+        repo = d[0]
+        ver = d[1]
+        rec = None
+        recver = ''
+        for r in reqlist:
+            vr = r[1]
+            if vr[0] != 'v':
+                vr = vr[0:7]
+            if r[0] == repo:
+                rec = r
+                if vr == ver:
+                    recver = vr
+
+        if rec is None:  # a new dependency
+            diffs.append([d, 1])
+        else:
+            if recver == '':
+                diffs.append([d, 2])
+
+    return diffs
 
 
 def out_to_list(a, b):
-    return []
+    lines = b.split('\n')
+    lines = lines[2:]
+    chain = []
+    for line in lines:
+        if line != '':
+            chain.append(line)
+    return chain
 
 
-def download_a_repo(repo):
-    return
+def download_a_repo(repo, version):
+    if not re.findall(r'^github.com/', repo):
+        (repo_name, siv_path) = get_repo_name(repo)
+    else:
+        repo_name = repo.replace('github.com/', '')
+
+    if repo_name == '':
+        return [1, '']
+
+    pkg_name = repo_name.replace('/', '=') + '@' + version
+    if os.path.isdir('./pkg/' + pkg_name):
+        return [0, pkg_name]
+    get_dep = DOWNLOAD([repo_name, version])
+    get_dep.down_load_unzip()
+    download_result = get_dep.download_result
+    if download_result == -1:
+        return [-1, '']
+    return [0, pkg_name]
 
 
 def read_in_file(pathname, file_type_descriptor):
@@ -475,30 +535,33 @@ def read_in_file(pathname, file_type_descriptor):
         # TODO write a initial go.mod
         write_go_mod(requires, replaces, reqlist)
 
+        (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod tidy')
 
-        # (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod tidy')
-        #
-        # diffs = get_diffs(reference, all_direct_r, all_direct_dep)
-        #
-        # for dif in diffs:
-        #     initial = dif[0]
-        #     after = dif[1]
-        #     (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod why ' + after[0])
-        #     chain = out_to_list(a, b)
-        #     length = len(chain)
+        diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
 
-            # for repo in chain:
-            #     download_a_repo(repo)
-            #     all_deps = deal_local_repo_dir()
-            #     ver = ''
-            #     for r in all_deps:
-            #         if r.Path == repo:
-            #             if r.Version != '':
-            #                 ver = r.Veriosn
-            #             else:
-            #                 ver = r.Revision
-            #
-            #     if ver ==
+        for dif in diffs:
+            after = dif[0]
+            diff_type = dif[1]
+            (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod why ' + after[0])
+            chain = out_to_list(a, b)  # chain is start with the project itself
+            length = len(chain)
+
+            if diff_type == 1:
+                version = after[1]
+                for repo in chain:
+                    ret = download_a_repo(repo, version)
+                    if ret[0] != 0:
+                        err = MessageMiss(repo, version, 3)
+                        errors.append(err)
+                        break
+
+                    all_deps = deal_local_repo_dir(ret[1], 2, [])
+                    ver = ''
+                    for r in all_deps:
+                        if r[0] == repo:
+                            if r[1] != '':
+                                ver = r[1]
+                    
 
 
 

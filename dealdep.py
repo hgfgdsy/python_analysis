@@ -610,6 +610,8 @@ def deal_local_repo_dir(repo_id, tag, references):
     else:
         if mod_list:
             (mod_dep_list, mod_rep_list, go_mod_module) = l_deal_mod(mod_list, repo_url, repo_name)
+            return mod_dep_list
 
         if tool_list:
             tool_dep_list = l_deal_tool(tool_list, repo_url, repo_name)
+            return tool_dep_list
