@@ -19,6 +19,7 @@ import subprocess
 
 from dealdep import get_mod_require, deal_dep_version, get_repo_name
 from download import *
+import hashlib
 
 
 def get_results(url, headers):
@@ -350,7 +351,18 @@ def download_a_repo(repo, version):
     return [0, pkg_name]
 
 
+def write_modify_to_mod(modifies):
+    return
+
+
+def hash_name(repo):
+    sha1 = hashlib.sha1()
+    sha1.update(repo)
+    return sha1.hexdigest()
+
+
 def read_in_file(pathname, file_type_descriptor):
+    dic_rec_ver = {}
     errors = []
     replaces = []
     if file_type_descriptor == 1:
@@ -539,29 +551,111 @@ def read_in_file(pathname, file_type_descriptor):
 
         diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
 
-        for dif in diffs:
+        modifies = []
+
+        for dif in diffs:  # 可以优化
             after = dif[0]
             diff_type = dif[1]
             (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod why ' + after[0])
             chain = out_to_list(a, b)  # chain is start with the project itself
             length = len(chain)
 
+            now_dep_list = []
+
+            for d in all_direct_dep:
+                now_dep_list.append([d[2], d[1]])
             if diff_type == 1:
-                version = after[1]
+                rec_name = ''
+                rec_version = ''
+                cnt = 0
                 for repo in chain:
-                    ret = download_a_repo(repo, version)
-                    if ret[0] != 0:
-                        err = MessageMiss(repo, version, 3)
+                    ver = ''
+                    for d in now_dep_list:
+                        if d[0] == repo:
+                            ver = d[1]
+                            break
+                    if ver == '':
+                        err = MessageMiss(repo, chain[0], 3)
                         errors.append(err)
                         break
+                    else:
+                        cnt = cnt + 1
+                        rec_name = repo
+                        rec_version = ver
+                        if cnt >= length:
+                            break
+                        hname = str(hash_name(repo))
+                        if hname in dic_rec_ver.keys():
+                            now_dep_list = dic_rec_ver[hname]
+                        else:
+                            ret = download_a_repo(repo, ver)
+                            if ret[0] != 0:
+                                err = MessageMiss(repo, chain[0], 3)
+                                errors.append(err)
+                                break
 
-                    all_deps = deal_local_repo_dir(ret[1], 2, [])
+                            all_deps = deal_local_repo_dir(ret[1], 2, [])
+                            dic_rec_ver[hname] = all_deps
+                            now_dep_list = all_deps
+
+                if rec_name != '' and rec_version != '':
+                    if rec_version != after[1]:
+                        modifies.append([rec_name, rec_version])
+            else:
+                rec_name = ''
+                rec_version = ''
+                cnt = 0
+                for repo in chain:
                     ver = ''
-                    for r in all_deps:
-                        if r[0] == repo:
-                            if r[1] != '':
-                                ver = r[1]
-                    
+                    for d in now_dep_list:
+                        if d[0] == repo:
+                            ver = d[1]
+                            break
+                    if ver == '':
+                        err = MessageMiss(repo, chain[0], 3)
+                        errors.append(err)
+                        break
+                    else:
+                        cnt = cnt + 1
+                        rec_name = repo
+                        rec_version = ver
+                        if cnt >= length:
+                            break
+                        hname = str(hash_name(repo))
+                        if hname in dic_rec_ver.keys():
+                            now_dep_list = dic_rec_ver[hname]
+                        else:
+                            ret = download_a_repo(repo, ver)
+                            if ret[0] != 0:
+                                err = MessageMiss(repo, chain[0], 3)
+                                errors.append(err)
+                                break
+
+                            all_deps = deal_local_repo_dir(ret[1], 2, [])
+                            dic_rec_ver[hname] = all_deps
+                            now_dep_list = all_deps
+
+                if rec_name != '' and rec_version != '':
+                    if rec_version != after[1]:
+                        modifies.append([rec_name, rec_version])
+
+                write_modify_to_mod(modifies)
+                # version = after[1]
+                # for repo in chain:
+                #     ret = download_a_repo(repo, version)
+                #     if ret[0] != 0:
+                #         err = MessageMiss(repo, version, 3)
+                #         errors.append(err)
+                #         break
+                #
+                #     all_deps = deal_local_repo_dir(ret[1], 2, [])
+                #     ver = ''
+                #     for r in all_deps:
+                #         if r[0] == repo:
+                #             if r[1] != '':
+                #                 ver = r[1]
+
+
 
 
 

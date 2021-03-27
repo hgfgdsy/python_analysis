@@ -343,9 +343,17 @@ def l_deal_tool(tool_list, repo_url, repo_name):
     tool_dep_list = []
     for r in references:
         if r.Version != '':
-            tool_dep_list.append([r.Path, r.Version])
+            if not re.findall(r'^v\d+?\.\d+?\.\d+?$', r.Version):
+                tool_dep_list.append([r.Path, ''])
+            else:
+                tool_dep_list.append([r.Path, r.Version])
         else:
-            tool_dep_list.append([r.Path, r.Revision])
+            if not re.findall(r'^[a-f0-9]+?$'):
+                tool_dep_list.append([r.Path, ''])
+            elif len(r.Revision) != 40:
+                tool_dep_list.append([r.Path, ''])
+            else:
+                tool_dep_list.append([r.Path, r.Revision[0:7]])
     return tool_dep_list
 
 
