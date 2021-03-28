@@ -1,7 +1,7 @@
 from dep import parse_gopkg_lock
 from cgo import write_go_mod
 import re
-from suffix import get_version_type
+from suffix import get_version_type, get_major
 
 import requests
 from urllib.request import Request, urlopen
@@ -285,7 +285,7 @@ def get_diffs(reqlist, all_direct_r, all_direct_dep):
     replaces = []
     mod_dep_list = []
     diffs = []
-    (requires, replaces) = get_mod_require('./pkg/hgfgdsy=migtry@v0.0.0/.go.mod', requires, replaces)
+    (requires, replaces) = get_mod_require('./pkg/hgfgdsy=migtry@v0.0.0/go.mod', requires, replaces)
 
     for m in requires:
         dep = m.replace('+replace', '').replace('// indirect', '').strip().split(' ')
@@ -468,7 +468,7 @@ def read_in_file(pathname, file_type_descriptor):
                         reqlist.append([origin_repo_name, r.Version])
 
                     if use_version == 1:  # has go.mod but in module path no version suffix
-                        i = re.findall(r'gopkg.in/')
+                        i = re.findall(r'gopkg.in/', origin_repo_name)
                         if not i:
                             requires.append(origin_repo_name + ' ' + r.Revision)
                             reqlist.append([origin_repo_name, r.Revision])
@@ -529,7 +529,7 @@ def read_in_file(pathname, file_type_descriptor):
         for r in reference:
             if r not in all_direct_r:
                 if r.Source != '':
-                    path = r.Source
+                    path = r.Path
                     if r.Version != '':
                         replaces.append((r.Path, r.Source, r.Version))
                     else:
@@ -538,8 +538,16 @@ def read_in_file(pathname, file_type_descriptor):
                     path = r.Path
 
                 if r.Version != '':
-                    requires.append(path + ' ' + r.Version)
-                    reqlist.append([path, r.Version])
+                    major = get_major(r.Version)
+                    if int(major) >= 2:
+                        if re.findall(r'$github\.com/', r.Source):
+                            use_version = get_version_type(r.Source, r.Version)
+                            if use_version < 2:
+                                requires.append(path + ' ' + r.Version)
+                                reqlist.append([path, r.Version])
+                    else:
+                        requires.append(path + ' ' + r.Version)
+                        reqlist.append([path, r.Version])
                 elif r.Revision != '':
                     requires.append(path + ' ' + r.Revision)
                     reqlist.append([path, r.Revision])
@@ -547,7 +555,8 @@ def read_in_file(pathname, file_type_descriptor):
         # TODO write a initial go.mod
         write_go_mod(requires, replaces, reqlist)
 
-        (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod tidy')
+        (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod tidy')
+        print(b)
 
         diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
 
@@ -556,7 +565,9 @@ def read_in_file(pathname, file_type_descriptor):
         for dif in diffs:  # 可以优化
             after = dif[0]
             diff_type = dif[1]
-            (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migrationcase@v0.0.0 && go mod why ' + after[0])
+            print(after[0])
+            (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod why ' + after[0])
+            print(a, b)
             chain = out_to_list(a, b)  # chain is start with the project itself
             length = len(chain)
 
@@ -600,6 +611,7 @@ def read_in_file(pathname, file_type_descriptor):
 
                 if rec_name != '' and rec_version != '':
                     if rec_version != after[1]:
+                        print(rec_name)
                         modifies.append([rec_name, rec_version])
             else:
                 rec_name = ''
@@ -637,9 +649,10 @@ def read_in_file(pathname, file_type_descriptor):
 
                 if rec_name != '' and rec_version != '':
                     if rec_version != after[1]:
+                        print(rec_name)
                         modifies.append([rec_name, rec_version])
 
-                write_modify_to_mod(modifies)
+                # write_modify_to_mod(modifies)
                 # version = after[1]
                 # for repo in chain:
                 #     ret = download_a_repo(repo, version)

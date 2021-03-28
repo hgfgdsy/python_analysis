@@ -33,6 +33,6 @@ def write_go_mod(requires, replaces, reqlist):
     msg = msg + ')\n'
     print(msg)
 
-    f = open('go.mod', 'w')
+    f = open('./pkg/hgfgdsy=migtry@v0.0.0/go.mod', 'w')
     f.write(msg)
     f.close()
