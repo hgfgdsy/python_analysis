@@ -535,9 +535,6 @@ def write_modify_to_mod(modifies):
     #         requires_list.append(require_r)
 
 
-    return
-
-
 def hash_name(repo):
     sha1 = hashlib.sha1()
     sha1.update(repo)
@@ -557,6 +554,7 @@ def read_in_file(pathname, file_type_descriptor):
 
         requires = []
         reqlist = []
+        upgrade_list = []
 
         (all_direct_r, all_direct_dep) = deal_local_repo_dir(repo_id, 1, reference)
         count = 0
@@ -590,14 +588,16 @@ def read_in_file(pathname, file_type_descriptor):
                             valid = 0
 
                         if new_path == '':
-                            err = MessageMiss(origin_repo_name, r.Version, 1)
+                            err = MessageMiss(origin_repo_name, r.Version, 1, file_type_descriptor)
                             errors.append(err)
+                            continue
+
                         elif valid != 0:
                             replaces.append((origin_repo_name, new_path, r.Version))
                             valid = 0
 
-                    if valid == 2:  # TODO get last version here
-                        err = MessageMiss(origin_repo_name, r.Version, 2)
+                    if valid == 2:
+                        err = MessageMiss(origin_repo_name, r.Version, 2, file_type_descriptor)
                         errors.append(err)
 
                     if valid != 0:
@@ -616,21 +616,34 @@ def read_in_file(pathname, file_type_descriptor):
                                 valid = 0
 
                             if new_path == '':
-                                err = MessageMiss(origin_repo_name, r.Revision, 1)
+                                err = MessageMiss(origin_repo_name, r.Revision, 1, file_type_descriptor)
                                 errors.append(err)
                             elif valid != 0:
                                 replaces.append((origin_repo_name, new_path, r.Revision))
                                 valid = 0
 
-                        if valid == 2:
-                            err = MessageMiss(path, r.Revision, 2)
-                            errors.append(err)
+                        if valid == 2:  # TODO get last version here
+                            (v_name, v_hash, search_e) = get_last_version_or_hashi(github_repo_name, 0)
+                            if v_name != '':
+                                requires.append(origin_repo_name + ' ' + v_name)
+                                reqlist.append([origin_repo_name, v_name])
+                                err = MessageMiss(origin_repo_name, v_name, 3, file_type_descriptor)
+                                errors.append(err)
+                                continue
+                            elif v_hash != '':
+                                requires.append(origin_repo_name + ' ' + v_hash)
+                                reqlist.append([origin_repo_name, v_hash])
+                                err = MessageMiss(origin_repo_name, v_hash, 3, file_type_descriptor)
+                                errors.append(err)
+                                continue
 
                         if valid == 0:
                             requires.append(origin_repo_name + ' ' + r.Revision)
                             reqlist.append([origin_repo_name, r.Revision])
                             continue
                         else:
+                            err = MessageMiss(origin_repo_name, r.Revision, 4, file_type_descriptor)
+                            errors.append(err)
                             continue
 
                     use_version = get_version_type(github_repo_name, r.Version)
@@ -639,7 +652,8 @@ def read_in_file(pathname, file_type_descriptor):
                         reqlist.append([origin_repo_name, r.Version])
 
                     if use_version == -10:
-                        err = MessageMiss(origin_repo_name, r.Version, 10)
+                        err = MessageMiss(origin_repo_name, r.Version, -10, file_type_descriptor)
+                        errors.append(err)
                         requires.append(origin_repo_name + ' ' + r.Revision)
                         reqlist.append([origin_repo_name, r.Revision])
 
@@ -691,17 +705,30 @@ def read_in_file(pathname, file_type_descriptor):
                             valid = 0
 
                         if new_path == '':
-                            err = MessageMiss(origin_repo_name, r.Revision, 1)
+                            err = MessageMiss(origin_repo_name, r.Revision, 1, file_type_descriptor)
                             errors.append(err)
                         elif valid != 0:
                             replaces.append((origin_repo_name, new_path, r.Revision))
                             valid = 0
 
                     if valid == 2:  # TODO get latest version or hash here
-                        err = MessageMiss(origin_repo_name, r.Revision, 2)
-                        errors.append(err)
+                        (v_name, v_hash, search_e) = get_last_version_or_hashi(github_repo_name, 0)
+                        if v_name != '':
+                            requires.append(origin_repo_name + ' ' + v_name)
+                            reqlist.append([origin_repo_name, v_name])
+                            err = MessageMiss(origin_repo_name, v_name, 3, file_type_descriptor)
+                            errors.append(err)
+                            continue
+                        elif v_hash != '':
+                            requires.append(origin_repo_name + ' ' + v_hash)
+                            reqlist.append([origin_repo_name, v_hash])
+                            err = MessageMiss(origin_repo_name, v_hash, 3, file_type_descriptor)
+                            errors.append(err)
+                            continue
 
                     if valid != 0:
+                        err = MessageMiss(origin_repo_name, r.Revision, 4, file_type_descriptor)
+                        errors.append(err)
                         continue
                     requires.append(origin_repo_name + ' ' + r.Revision)
                     reqlist.append([origin_repo_name, r.Revision])
@@ -739,6 +766,7 @@ def read_in_file(pathname, file_type_descriptor):
         write_go_mod(requires, replaces, reqlist)
 
         (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod tidy')
+
         print(b)
 
         diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
@@ -769,7 +797,7 @@ def read_in_file(pathname, file_type_descriptor):
                             ver = d[1]
                             break
                     if ver == '':
-                        err = MessageMiss(repo, chain[0], 3)
+                        err = MessageMiss(repo, chain[0], 5, file_type_descriptor)
                         errors.append(err)
                         break
                     else:
@@ -784,7 +812,7 @@ def read_in_file(pathname, file_type_descriptor):
                         else:
                             ret = download_a_repo(repo, ver)
                             if ret[0] != 0:
-                                err = MessageMiss(repo, chain[0], 3)
+                                err = MessageMiss(repo, chain[0], 6, file_type_descriptor)
                                 errors.append(err)
                                 break
 
@@ -807,7 +835,7 @@ def read_in_file(pathname, file_type_descriptor):
                             ver = d[1]
                             break
                     if ver == '':
-                        err = MessageMiss(repo, chain[0], 3)
+                        err = MessageMiss(repo, chain[0], 5, file_type_descriptor)
                         errors.append(err)
                         break
                     else:
@@ -822,7 +850,7 @@ def read_in_file(pathname, file_type_descriptor):
                         else:
                             ret = download_a_repo(repo, ver)
                             if ret[0] != 0:
-                                err = MessageMiss(repo, chain[0], 3)
+                                err = MessageMiss(repo, chain[0], 6, file_type_descriptor)
                                 errors.append(err)
                                 break
 
@@ -833,9 +861,11 @@ def read_in_file(pathname, file_type_descriptor):
                 if rec_name != '' and rec_version != '':
                     if rec_version != after[1]:
                         print(rec_name)
+                        err = MessageMiss(rec_name, rec_version, 7, file_type_descriptor)
+                        errors.append(err)
                         modifies.append([rec_name, rec_version])
 
-                # write_modify_to_mod(modifies)
+                write_modify_to_mod(modifies)
                 # version = after[1]
                 # for repo in chain:
                 #     ret = download_a_repo(repo, version)
