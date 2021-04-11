@@ -589,7 +589,7 @@ def deal_local_repo_dir(repo_id, tag, references):
     go_list = []
     mod_list = []
     tool_list = []
-    if tag == 1:
+    if tag == 1 or tag == 0:
         nd_path = os.path.join('.', 'pkg')
     else:
         nd_path = os.path.join('.', 'pkg1')
@@ -611,7 +611,9 @@ def deal_local_repo_dir(repo_id, tag, references):
     mod_rep_list = []
     go_mod_module = ''
 
-    if tag == 1:
+    if tag == 0:
+        return go_list
+    elif tag == 1:
         (import_list, self_ref) = deal_go_files(go_list, repo_url, go_mod_module)
         (direct_r_list, direct_repo_list) = get_all_direct_dep(import_list, references)
         return direct_r_list, direct_repo_list

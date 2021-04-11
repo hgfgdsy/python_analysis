@@ -9,8 +9,9 @@ from bs4 import BeautifulSoup
 import json
 import random
 import pymysql
+import chardet
 
-from dealdep import deal_local_repo_dir, get_db_search, get_db_insert
+from dealdep import deal_local_repo_dir, get_db_search, get_db_insert, deal_local_repo, get_requires_from_file
 
 from missing import *
 import os
@@ -541,6 +542,55 @@ def hash_name(repo):
     return sha1.hexdigest()
 
 
+def write_modify_to_go_file(old, new, file_url):
+
+    f = open(file_url, 'rb')
+    f_content = f.read()
+    f_charInfo = chardet.detect(f_content)
+    # print(f_charInfo)
+
+    if not f_charInfo['encoding']:
+        file_content = f_content.decode('utf-8', 'ignore')
+    elif f_charInfo['encoding'] == 'EUC-TW':
+        file_content = f_content.decode('utf-8', 'ignore')
+    else:
+        file_content = f_content.decode(f_charInfo['encoding'], errors='ignore')
+
+    f.close()
+    # lines = file_content.split('\n')
+    # label = 0
+    # msg = ''
+    # for line in lines:
+    #     if label == 0:
+    #         msg = msg
+
+    file_content.replace(old, new)
+    f = open(file_url, 'w')
+    f.write(file_content)
+    f.close()
+    return
+
+
+def modify_go_files(old, new, file_url):
+    import_list = []
+    import_list = get_requires_from_file(file_url, import_list)
+    tag = 0
+    for imp in import_list:
+        if imp == old:
+            tag = 1
+
+    if tag == 1:
+        write_modify_to_go_file(old, new, file_url)
+    return
+
+
+def add_suffix(old, new, repo_url, go_list):
+    for f_url in go_list:
+        file_url = repo_url + f_url
+        modify_go_files(old, new, file_url)
+    return
+
+
 def read_in_file(pathname, file_type_descriptor):
     dic_rec_ver = {}
     errors = []
@@ -554,7 +604,11 @@ def read_in_file(pathname, file_type_descriptor):
 
         requires = []
         reqlist = []
+
         upgrade_list = []
+        go_list = deal_local_repo_dir(repo_id, 0, reference)
+        nd_path = os.path.join('.', 'pkg')
+        repo_url = os.path.join(nd_path, repo_id)
 
         (all_direct_r, all_direct_dep) = deal_local_repo_dir(repo_id, 1, reference)
         count = 0
