@@ -2,13 +2,13 @@ from pip._vendor.distlib.compat import raw_input
 
 
 def get_module_path():
-    mp = raw_input("Module path is : ")
-    return mp
+    # mp = raw_input("Module path is : ")
+    return 'github.com/hgfgdsy/sec'
 
 
 def get_go_version():
-    vs = raw_input("Go version is : ")
-    return vs
+    # vs = raw_input("Go version is : ")
+    return '1.15'
 
 
 def write_go_mod(requires, replaces, reqlist):

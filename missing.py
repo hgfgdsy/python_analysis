@@ -28,10 +28,13 @@ class MessageMiss:
         elif self.error_type == 6:  # 递归分析依赖中断 间接依赖
             msg = 'fail to recursively analyse the version of dependencies for ' + self.repo_name + ', '
             msg = msg + 'it may caused by errors in config files in dependencies'
+        elif self.error_type == 7:  # 提醒用户添加版本后缀修改了源文件
+            msg = 'go source files containing dependency ' + self.repo_name + ' has been modified to add version suffix'
         return msg
 
 
 def tackle_errors(err_list):
     msg = ''
     for err in err_list:
-        msg = msg + err.tackle_error_by_type()
+        msg = msg + err.tackle_error_by_type() + '\n'
+    return msg

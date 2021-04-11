@@ -47,7 +47,8 @@ def get_token():  # download 重复
     # index_num = random.randint(0, 2)
     # return token_list[index_num]
 
-    return '2dcf8df8093697b00207ec01051847f269987e33'
+    # return '2dcf8df8093697b00207ec01051847f269987e33'
+    return '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'
 
 
 def get_headers():
@@ -321,12 +322,13 @@ def check_repo_db_v_hash(repo_name, repo_hash):
 
 
 def check_repo_db_for_valid(repo_name, repo_version, repo_hash):
-    if repo_version == "":
+    if repo_version != "":
         r = check_repo_db_v_name(repo_name, repo_version)
     else:
         r = check_repo_db_v_hash(repo_name, repo_hash)
 
     if r:
+        print(r[0])
         return 0
     else:
         return -1
@@ -564,9 +566,9 @@ def write_modify_to_go_file(old, new, file_url):
     #     if label == 0:
     #         msg = msg
 
-    file_content.replace(old, new)
+    fwrite = file_content.replace(old, new)
     f = open(file_url, 'w')
-    f.write(file_content)
+    f.write(fwrite)
     f.close()
     return
 
@@ -580,6 +582,7 @@ def modify_go_files(old, new, file_url):
             tag = 1
 
     if tag == 1:
+        # print('indeed')
         write_modify_to_go_file(old, new, file_url)
     return
 
@@ -607,6 +610,7 @@ def read_in_file(pathname, file_type_descriptor):
 
         upgrade_list = []
         go_list = deal_local_repo_dir(repo_id, 0, reference)
+        # print('length = ' + str(len(go_list)))
         nd_path = os.path.join('.', 'pkg')
         repo_url = os.path.join(nd_path, repo_id)
 
@@ -617,6 +621,7 @@ def read_in_file(pathname, file_type_descriptor):
             count = count + 1
             origin_repo_name = d[2]
             github_repo_name = d[0]
+            print(github_repo_name)
             if r.Version != '':
                 if d[4] != '':
                     github_repo_name = d[4]
@@ -631,7 +636,6 @@ def read_in_file(pathname, file_type_descriptor):
                     valid = check_repo_db_for_valid(github_repo_name, r.Version, "")
                     if valid == -1:
                         valid = check_repo_valid(path, r.Version)
-
                     new_path = ''
                     if valid == 1:
                         new_path = get_redirect_repo(github_repo_name)
@@ -730,6 +734,9 @@ def read_in_file(pathname, file_type_descriptor):
                     if use_version >= 2:
                         requires.append(origin_repo_name + '/' + 'v' + str(use_version) + ' ' + r.Version)
                         reqlist.append([origin_repo_name, r.Version])
+                        err = MessageMiss(origin_repo_name, r.Version, 7, file_type_descriptor)
+                        errors.append(err)
+                        add_suffix(origin_repo_name, origin_repo_name + '/' + 'v' + str(use_version), repo_url, go_list)
                 else:
                     requires.append(origin_repo_name + ' ' + r.Version)
                     reqlist.append([origin_repo_name, r.Version])
@@ -836,6 +843,9 @@ def read_in_file(pathname, file_type_descriptor):
             chain = out_to_list(a, b)  # chain is start with the project itself
             length = len(chain)
 
+            if length == 1:
+                continue
+
             now_dep_list = []
 
             for d in all_direct_dep:
@@ -920,6 +930,8 @@ def read_in_file(pathname, file_type_descriptor):
                         modifies.append([rec_name, rec_version])
 
                 write_modify_to_mod(modifies)
+        msg = tackle_errors(errors)
+        print(msg)
                 # version = after[1]
                 # for repo in chain:
                 #     ret = download_a_repo(repo, version)

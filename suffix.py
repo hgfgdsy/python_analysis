@@ -69,13 +69,13 @@ def get_version_type(name, version):
     get_dep.down_load_unzip()
     download_result = get_dep.download_result
     cnt = 0
-    while download_result == -1:
-        shutil.rmtree(get_dep.dst_name)
-        get_dep.down_load_unzip()
-        download_result = get_dep.download_result
-        cnt = cnt + 1
-        if cnt > 5:
-            break
+    # while download_result == -1:
+    #     shutil.rmtree(get_dep.dst_name)
+    #     get_dep.down_load_unzip()
+    #     download_result = get_dep.download_result
+    #     cnt = cnt + 1
+    #     if cnt > 5:
+    #         break
 
     if download_result != -1:
         # pkg_name = os.listdir(os.path.join(get_dep.save_name, '1'))[0]
