@@ -31,24 +31,9 @@ def get_results(url, headers):
 
 
 def get_token():  # download 重复
-    # token 0a6cca72aa3cc98993950500c87831bfef7e5707 [meng] Y
-    # token ad418c5441a67ad8b2c95188e131876c6a1187fe [end] x
-    # token abdd967d350662632381f130cd62268ed2f961a1 [end] x
-    # token ff4e63b2dba8febac0aeb59aa3b8829a05de97e7 [hu] x
-    # token a41ca9587818fc355b015376e814df47223fc136 [me] x
-
-    # token a8ad3ffb79d2ef67a1f19da8245ff361e624dc20 [ql] x
-    # token 6f8454c973d4f7f07a57c2982db79d2ce543403d [zs] x
-    # token 3e87d1e3a489815cdf597a10b426ad1e2a7426db [zs]
-    # token 24748c727dfbcbfa18c3478f495c2b8b6ed1703e [ql]
-
-    # token_list = ['0a6cca72aa3cc98993950500c87831bfef7e5707', '24748c727dfbcbfa18c3478f495c2b8b6ed1703e',
-    #               '3e87d1e3a489815cdf597a10b426ad1e2a7426db']
-    # index_num = random.randint(0, 2)
-    # return token_list[index_num]
-
-    # return '2dcf8df8093697b00207ec01051847f269987e33'
-    return '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'
+    f = open('../tokens/tk.txt', 'r')
+    data = f.read()
+    return data
 
 
 def get_headers():
@@ -404,6 +389,8 @@ def get_diffs(reqlist, all_direct_r, all_direct_dep):
         ver = d[1]
         rec = None
         recver = ''
+        if d[2] == 3:
+            continue
         for r in reqlist:
             vr = r[1]
             if vr[0] != 'v':
@@ -412,6 +399,7 @@ def get_diffs(reqlist, all_direct_r, all_direct_dep):
                 rec = r
                 if vr == ver:
                     recver = vr
+                break
 
         if rec is None:  # a new dependency
             diffs.append([d, 1])
@@ -540,7 +528,7 @@ def write_modify_to_mod(modifies):
 
 def hash_name(repo):
     sha1 = hashlib.sha1()
-    sha1.update(repo)
+    sha1.update(repo.encode('utf-8'))
     return sha1.hexdigest()
 
 
@@ -594,6 +582,26 @@ def add_suffix(old, new, repo_url, go_list):
     return
 
 
+def check_now_repo(old):
+    return get_new_url(old)
+
+
+def check_redirected(old, github_repo_name):
+    new_path = get_redirect_repo(github_repo_name)
+    if new_path == '':
+        new_path = check_now_repo(old)
+        if new_path != '':
+            domain = re.findall(r'^([^/]+?)/')
+            if domain == 'github.com':
+                return 1, new_path.replace('github.com/', '')
+            else:
+                return 2, new_path
+        else:
+            return 0, ''
+    else:
+        return 1, new_path
+
+
 def read_in_file(pathname, file_type_descriptor):
     dic_rec_ver = {}
     errors = []
@@ -617,6 +625,7 @@ def read_in_file(pathname, file_type_descriptor):
         (all_direct_r, all_direct_dep) = deal_local_repo_dir(repo_id, 1, reference)
         count = 0
         for d in all_direct_dep:
+            redirected = 0
             r = all_direct_r[count]
             count = count + 1
             origin_repo_name = d[2]
@@ -640,62 +649,71 @@ def read_in_file(pathname, file_type_descriptor):
                     if valid == 1:
                         new_path = get_redirect_repo(github_repo_name)
                         if new_path == '':
-                            new_path = get_new_url(path)
-                        else:
-                            replaces.append((origin_repo_name, 'github.com/' + new_path, r.Version))
-                            valid = 0
-
-                        if new_path == '':
                             err = MessageMiss(origin_repo_name, r.Version, 1, file_type_descriptor)
                             errors.append(err)
-                            continue
-
-                        elif valid != 0:
-                            replaces.append((origin_repo_name, new_path, r.Version))
+                            break
+                            # new_path = get_new_url(path)
+                        else:
+                            # replaces.append((origin_repo_name, 'github.com/' + new_path, r.Version))
+                            github_repo_name = new_path
+                            redirected = 1
                             valid = 0
+                            err = MessageMiss(origin_repo_name, 'github.com/' + github_repo_name, 8, file_type_descriptor)
+                            errors.append(err)
+
+                    if redirected == 0:
+                        (redirected, new_path) = check_redirected(origin_repo_name, github_repo_name)
+
+                        if redirected == 2:
+                            err = MessageMiss(origin_repo_name, new_path, 8,
+                                              file_type_descriptor)
+                            errors.append(err)
+                            replaces.append((origin_repo_name, new_path, r.Version))
+                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                            reqlist.append([origin_repo_name, 'v0.0.0'])
+                            continue
+                        elif redirected == 1:
+                            err = MessageMiss(origin_repo_name, 'github.com/' + github_repo_name, 8,
+                                              file_type_descriptor)
+                            errors.append(err)
+                            github_repo_name = new_path
 
                     if valid == 2:
                         err = MessageMiss(origin_repo_name, r.Version, 2, file_type_descriptor)
                         errors.append(err)
 
-                    if valid != 0:
                         valid = check_repo_db_for_valid(origin_repo_name, "", r.Revision)
 
                         if valid == -1:
                             valid = check_repo_valid(path, r.Revision)
 
-                        new_path = ''
-                        if valid == 1:
-                            new_path = get_redirect_repo(github_repo_name)
-                            if new_path == '':
-                                new_path = get_new_url(path)
-                            else:
-                                replaces.append((origin_repo_name, 'github.com/' + new_path, r.Revision))
-                                valid = 0
-
-                            if new_path == '':
-                                err = MessageMiss(origin_repo_name, r.Revision, 1, file_type_descriptor)
-                                errors.append(err)
-                            elif valid != 0:
-                                replaces.append((origin_repo_name, new_path, r.Revision))
-                                valid = 0
-
                         if valid == 2:  # TODO get last version here
                             (v_name, v_hash, search_e) = get_last_version_or_hashi(github_repo_name, 0)
                             if v_name != '':
-                                requires.append(origin_repo_name + ' ' + v_name)
-                                reqlist.append([origin_repo_name, v_name])
+                                if redirected == 1:
+                                    replaces.append((origin_repo_name, 'github.com/' + github_repo_name, v_name))
+                                    requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                    reqlist.append([origin_repo_name, 'v0.0.0'])
+                                else:
+                                    requires.append(origin_repo_name + ' ' + v_name)
+                                    reqlist.append([origin_repo_name, v_name])
                                 err = MessageMiss(origin_repo_name, v_name, 3, file_type_descriptor)
                                 errors.append(err)
                                 continue
                             elif v_hash != '':
-                                requires.append(origin_repo_name + ' ' + v_hash)
-                                reqlist.append([origin_repo_name, v_hash])
+                                if redirected == 1:
+                                    replaces.append((origin_repo_name, 'github.com/' + github_repo_name, v_hash))
+                                    requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                    reqlist.append([origin_repo_name, 'v0.0.0'])
+                                else:
+                                    requires.append(origin_repo_name + ' ' + v_hash)
+                                    reqlist.append([origin_repo_name, v_hash])
                                 err = MessageMiss(origin_repo_name, v_hash, 3, file_type_descriptor)
                                 errors.append(err)
                                 continue
 
                         if valid == 0:
+
                             requires.append(origin_repo_name + ' ' + r.Revision)
                             reqlist.append([origin_repo_name, r.Revision])
                             continue
@@ -706,22 +724,35 @@ def read_in_file(pathname, file_type_descriptor):
 
                     use_version = get_version_type(github_repo_name, r.Version)
                     if use_version == -11:
-                        requires.append(origin_repo_name + ' ' + r.Version)
-                        reqlist.append([origin_repo_name, r.Version])
+                        if redirected == 1:
+                            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Version))
+                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                            reqlist.append([origin_repo_name, 'v0.0.0'])
+                        else:
+                            requires.append(origin_repo_name + ' ' + r.Version)
+                            reqlist.append([origin_repo_name, r.Version])
 
                     if use_version == -10:
                         err = MessageMiss(origin_repo_name, r.Version, -10, file_type_descriptor)
                         errors.append(err)
-                        requires.append(origin_repo_name + ' ' + r.Revision)
-                        reqlist.append([origin_repo_name, r.Revision])
-
+                        if redirected == 1:
+                            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                            reqlist.append([origin_repo_name, 'v0.0.0'])
+                        else:
+                            requires.append(origin_repo_name + ' ' + r.Revision)
+                            reqlist.append([origin_repo_name, r.Revision])
                     if use_version == -1:
                         print("It should not occur!(where major version doesn't equal to version in module path)")
 
                     if use_version == 0:  # no go.mod in dst pkg
-                        requires.append(origin_repo_name + ' ' + r.Version + '+incompatible')
-                        reqlist.append([origin_repo_name, r.Version])
-
+                        if redirected == 1:
+                            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Version))
+                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                            reqlist.append([origin_repo_name, 'v0.0.0'])
+                        else:
+                            requires.append(origin_repo_name + ' ' + r.Version + '+incompatible')
+                            reqlist.append([origin_repo_name, r.Version])
                     if use_version == 1:  # has go.mod but in module path no version suffix
                         i = re.findall(r'gopkg.in/', origin_repo_name)
                         if not i:
@@ -732,11 +763,16 @@ def read_in_file(pathname, file_type_descriptor):
                             reqlist.append([origin_repo_name, r.Version])
 
                     if use_version >= 2:
-                        requires.append(origin_repo_name + '/' + 'v' + str(use_version) + ' ' + r.Version)
-                        reqlist.append([origin_repo_name, r.Version])
-                        err = MessageMiss(origin_repo_name, r.Version, 7, file_type_descriptor)
-                        errors.append(err)
-                        add_suffix(origin_repo_name, origin_repo_name + '/' + 'v' + str(use_version), repo_url, go_list)
+                        if redirected == 1:
+                            replaces.append((origin_repo_name, 'github.com/' + github_repo_name + '/' + 'v' + str(use_version), r.Version))
+                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                            reqlist.append([origin_repo_name, 'v0.0.0'])
+                        else:
+                            requires.append(origin_repo_name + '/' + 'v' + str(use_version) + ' ' + r.Version)
+                            reqlist.append([origin_repo_name, r.Version])
+                            err = MessageMiss(origin_repo_name, r.Version, 7, file_type_descriptor)
+                            errors.append(err)
+                            add_suffix(origin_repo_name, origin_repo_name + '/' + 'v' + str(use_version), repo_url, go_list)
                 else:
                     requires.append(origin_repo_name + ' ' + r.Version)
                     reqlist.append([origin_repo_name, r.Version])
@@ -756,33 +792,59 @@ def read_in_file(pathname, file_type_descriptor):
                     if valid == -1:
                         valid = check_repo_valid(path, r.Revision)
 
-                    new_path = ''
                     if valid == 1:
                         new_path = get_redirect_repo(github_repo_name)
                         if new_path == '':
-                            new_path = get_new_url(path)
-                        else:
-                            replaces.append((origin_repo_name, 'github.com/' + new_path, r.Revision))
-                            valid = 0
-
-                        if new_path == '':
                             err = MessageMiss(origin_repo_name, r.Revision, 1, file_type_descriptor)
                             errors.append(err)
-                        elif valid != 0:
-                            replaces.append((origin_repo_name, new_path, r.Revision))
+                            break
+                        else:
+                            # replaces.append((origin_repo_name, 'github.com/' + new_path, r.Revision))
+                            github_repo_name = new_path
+                            redirected = 1
                             valid = 0
+                            err = MessageMiss(origin_repo_name, 'github.com/' + github_repo_name, 8,
+                                              file_type_descriptor)
+                            errors.append(err)
+
+                    if redirected == 0:
+                        (redirected, new_path) = check_redirected(origin_repo_name, github_repo_name)
+
+                        if redirected == 2:
+                            err = MessageMiss(origin_repo_name, new_path, 8,
+                                              file_type_descriptor)
+                            errors.append(err)
+                            replaces.append((origin_repo_name, new_path, r.Version))
+                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                            reqlist.append([origin_repo_name, 'v0.0.0'])
+                            continue
+                        elif redirected == 1:
+                            err = MessageMiss(origin_repo_name, 'github.com/' + github_repo_name, 8,
+                                              file_type_descriptor)
+                            errors.append(err)
+                            github_repo_name = new_path
 
                     if valid == 2:  # TODO get latest version or hash here
                         (v_name, v_hash, search_e) = get_last_version_or_hashi(github_repo_name, 0)
                         if v_name != '':
-                            requires.append(origin_repo_name + ' ' + v_name)
-                            reqlist.append([origin_repo_name, v_name])
+                            if redirected == 1:
+                                replaces.append((origin_repo_name, 'github.com/' + github_repo_name, v_name))
+                                requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                reqlist.append([origin_repo_name, 'v0.0.0'])
+                            else:
+                                requires.append(origin_repo_name + ' ' + v_name)
+                                reqlist.append([origin_repo_name, v_name])
                             err = MessageMiss(origin_repo_name, v_name, 3, file_type_descriptor)
                             errors.append(err)
                             continue
                         elif v_hash != '':
-                            requires.append(origin_repo_name + ' ' + v_hash)
-                            reqlist.append([origin_repo_name, v_hash])
+                            if redirected == 1:
+                                replaces.append((origin_repo_name, 'github.com/' + github_repo_name, v_hash))
+                                requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                reqlist.append([origin_repo_name, 'v0.0.0'])
+                            else:
+                                requires.append(origin_repo_name + ' ' + v_hash)
+                                reqlist.append([origin_repo_name, v_hash])
                             err = MessageMiss(origin_repo_name, v_hash, 3, file_type_descriptor)
                             errors.append(err)
                             continue
@@ -791,8 +853,13 @@ def read_in_file(pathname, file_type_descriptor):
                         err = MessageMiss(origin_repo_name, r.Revision, 4, file_type_descriptor)
                         errors.append(err)
                         continue
-                    requires.append(origin_repo_name + ' ' + r.Revision)
-                    reqlist.append([origin_repo_name, r.Revision])
+                    if redirected == 1:
+                        replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+                        requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                        reqlist.append([origin_repo_name, 'v0.0.0'])
+                    else:
+                        requires.append(origin_repo_name + ' ' + r.Revision)
+                        reqlist.append([origin_repo_name, r.Revision])
                 else:
                     requires.append(origin_repo_name + ' ' + r.Revision)
                     reqlist.append([origin_repo_name, r.Revision])
@@ -826,6 +893,10 @@ def read_in_file(pathname, file_type_descriptor):
         # TODO write a initial go.mod
         write_go_mod(requires, replaces, reqlist)
 
+        repnames = []
+        for rep in replaces:
+            repnames.append(rep[0])
+
         (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod tidy')
 
         print(b)
@@ -837,13 +908,15 @@ def read_in_file(pathname, file_type_descriptor):
         for dif in diffs:  # 可以优化
             after = dif[0]
             diff_type = dif[1]
-            print(after[0])
             (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod why ' + after[0])
             print(a, b)
             chain = out_to_list(a, b)  # chain is start with the project itself
             length = len(chain)
 
             if length == 1:
+                continue
+
+            if chain[0] in repnames:
                 continue
 
             now_dep_list = []
@@ -856,6 +929,10 @@ def read_in_file(pathname, file_type_descriptor):
                 cnt = 0
                 for repo in chain:
                     ver = ''
+                    if not now_dep_list:
+                        err = MessageMiss(repo, chain[0], 9, file_type_descriptor)
+                        errors.append(err)
+                        break
                     for d in now_dep_list:
                         if d[0] == repo:
                             ver = d[1]
@@ -886,7 +963,6 @@ def read_in_file(pathname, file_type_descriptor):
 
                 if rec_name != '' and rec_version != '':
                     if rec_version != after[1]:
-                        print(rec_name)
                         modifies.append([rec_name, rec_version])
             else:
                 rec_name = ''
@@ -924,7 +1000,6 @@ def read_in_file(pathname, file_type_descriptor):
 
                 if rec_name != '' and rec_version != '':
                     if rec_version != after[1]:
-                        print(rec_name)
                         err = MessageMiss(rec_name, rec_version, 7, file_type_descriptor)
                         errors.append(err)
                         modifies.append([rec_name, rec_version])

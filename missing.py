@@ -30,6 +30,10 @@ class MessageMiss:
             msg = msg + 'it may caused by errors in config files in dependencies'
         elif self.error_type == 7:  # 提醒用户添加版本后缀修改了源文件
             msg = 'go source files containing dependency ' + self.repo_name + ' has been modified to add version suffix'
+        elif self.error_type == 8:  # 提醒用户依赖被重定向了
+            msg = 'dependency ' + self.repo_name + ' has been redirected, new repo name is ' + self.repo_version
+        elif self.error_type == 9:
+            msg = 'fail to recursively analyze indirect dependencies for ' + self.repo_version
         return msg
 
 

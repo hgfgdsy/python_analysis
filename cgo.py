@@ -29,7 +29,7 @@ def write_go_mod(requires, replaces, reqlist):
     msg = msg + '\n'
     msg = msg + 'replace (' + '\n'
     for r in replaces:
-        msg = msg + r[0] + ' ' + r[2] + ' => ' + r[1] + ' ' + r[2] + '\n'
+        msg = msg + r[0] + ' ' + ' => ' + r[1] + ' ' + r[2] + '\n'
     msg = msg + ')\n'
     print(msg)
 
