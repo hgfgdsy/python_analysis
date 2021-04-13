@@ -1,7 +1,7 @@
 from dep import parse_gopkg_lock
 from cgo import write_go_mod
 import re
-from suffix import get_version_type, get_major
+from suffix import get_version_type, get_major, get_revision_type
 
 import requests
 from urllib.request import Request, urlopen
@@ -602,6 +602,55 @@ def check_redirected(old, github_repo_name):
         return 1, new_path
 
 
+def revision_major(origin_repo_name, file_type_descriptor, errors, redirected, replaces, requires,
+                   reqlist, github_repo_name, r, repo_url, go_list):
+    use_version = get_revision_type(github_repo_name, r.Revision)
+    if use_version == -10:
+        err = MessageMiss(origin_repo_name, r.Revision, -10, file_type_descriptor)
+        errors.append(err)
+        if redirected == 1:
+            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+            reqlist.append([origin_repo_name, 'v0.0.0'])
+        else:
+            requires.append(origin_repo_name + ' ' + r.Revision)
+            reqlist.append([origin_repo_name, r.Revision])
+    if use_version == -1:
+        print("It should not occur!(where major version doesn't equal to version in module path)")
+
+    if use_version == 0:  # no go.mod in dst pkg
+        if redirected == 1:
+            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+            reqlist.append([origin_repo_name, 'v0.0.0'])
+        else:
+            requires.append(origin_repo_name + ' ' + r.Revision)
+            reqlist.append([origin_repo_name, r.Revision])
+    if use_version == 1:  # has go.mod but in module path no version suffix
+        if redirected == 1:
+            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+            reqlist.append([origin_repo_name, 'v0.0.0'])
+        else:
+            requires.append(origin_repo_name + ' ' + r.Revision)
+            reqlist.append([origin_repo_name, r.Revision])
+
+    if use_version >= 2:
+        if redirected == 1:
+            replaces.append(
+                (origin_repo_name, 'github.com/' + github_repo_name + '/' + 'v' + str(use_version), r.Revision))
+            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+            reqlist.append([origin_repo_name, 'v0.0.0'])
+        else:
+            requires.append(origin_repo_name + '/' + 'v' + str(use_version) + ' ' + r.Revision)
+            reqlist.append([origin_repo_name, r.Revision])
+            err = MessageMiss(origin_repo_name, r.Revision, 7, file_type_descriptor)
+            errors.append(err)
+            add_suffix(origin_repo_name, origin_repo_name + '/' + 'v' + str(use_version), repo_url, go_list)
+
+    return errors, replaces, requires, reqlist
+
+
 def read_in_file(pathname, file_type_descriptor):
     dic_rec_ver = {}
     errors = []
@@ -713,9 +762,12 @@ def read_in_file(pathname, file_type_descriptor):
                                 continue
 
                         if valid == 0:
-
-                            requires.append(origin_repo_name + ' ' + r.Revision)
-                            reqlist.append([origin_repo_name, r.Revision])
+                            (errors, replaces, requires, reqlist) = revision_major(origin_repo_name,
+                                                                                   file_type_descriptor, errors,
+                                                                                   redirected, replaces,
+                                                                                   requires, reqlist,
+                                                                                   github_repo_name, r,
+                                                                                   repo_url, go_list)
                             continue
                         else:
                             err = MessageMiss(origin_repo_name, r.Revision, 4, file_type_descriptor)
@@ -736,12 +788,12 @@ def read_in_file(pathname, file_type_descriptor):
                         err = MessageMiss(origin_repo_name, r.Version, -10, file_type_descriptor)
                         errors.append(err)
                         if redirected == 1:
-                            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+                            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Version))
                             requires.append(origin_repo_name + ' ' + 'v0.0.0')
                             reqlist.append([origin_repo_name, 'v0.0.0'])
                         else:
-                            requires.append(origin_repo_name + ' ' + r.Revision)
-                            reqlist.append([origin_repo_name, r.Revision])
+                            requires.append(origin_repo_name + ' ' + r.Version)
+                            reqlist.append([origin_repo_name, r.Version])
                     if use_version == -1:
                         print("It should not occur!(where major version doesn't equal to version in module path)")
 
@@ -756,8 +808,13 @@ def read_in_file(pathname, file_type_descriptor):
                     if use_version == 1:  # has go.mod but in module path no version suffix
                         i = re.findall(r'gopkg.in/', origin_repo_name)
                         if not i:
-                            requires.append(origin_repo_name + ' ' + r.Revision)
-                            reqlist.append([origin_repo_name, r.Revision])
+                            if redirected == 1:
+                                replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+                                requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                reqlist.append([origin_repo_name, 'v0.0.0'])
+                            else:
+                                requires.append(origin_repo_name + ' ' + r.Revision)
+                                reqlist.append([origin_repo_name, r.Revision])
                         else:
                             requires.append(origin_repo_name + ' ' + r.Version)
                             reqlist.append([origin_repo_name, r.Version])
@@ -853,13 +910,19 @@ def read_in_file(pathname, file_type_descriptor):
                         err = MessageMiss(origin_repo_name, r.Revision, 4, file_type_descriptor)
                         errors.append(err)
                         continue
-                    if redirected == 1:
-                        replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
-                        requires.append(origin_repo_name + ' ' + 'v0.0.0')
-                        reqlist.append([origin_repo_name, 'v0.0.0'])
-                    else:
-                        requires.append(origin_repo_name + ' ' + r.Revision)
-                        reqlist.append([origin_repo_name, r.Revision])
+                    (errors, replaces, requires, reqlist) = revision_major(origin_repo_name,
+                                                                           file_type_descriptor, errors,
+                                                                           redirected, replaces,
+                                                                           requires, reqlist,
+                                                                           github_repo_name, r,
+                                                                           repo_url, go_list)
+                    # if redirected == 1:
+                    #     replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Revision))
+                    #     requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                    #     reqlist.append([origin_repo_name, 'v0.0.0'])
+                    # else:
+                    #     requires.append(origin_repo_name + ' ' + r.Revision)
+                    #     reqlist.append([origin_repo_name, r.Revision])
                 else:
                     requires.append(origin_repo_name + ' ' + r.Revision)
                     reqlist.append([origin_repo_name, r.Revision])
@@ -887,6 +950,11 @@ def read_in_file(pathname, file_type_descriptor):
                         requires.append(path + ' ' + r.Version)
                         reqlist.append([path, r.Version])
                 elif r.Revision != '':
+                    (repo_name, siv_path) = get_repo_name(path)
+                    if repo_name != '':
+                        use_version = get_revision_type(repo_name, r.Revision)
+                        if use_version >= 2:
+                            continue
                     requires.append(path + ' ' + r.Revision)
                     reqlist.append([path, r.Revision])
 
