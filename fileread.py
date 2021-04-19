@@ -482,6 +482,7 @@ def write_modify_to_mod(modifies):
     tag = 0
     msg = ''
     lines = go_mod_content.split('\n')
+    label = 0
     for line in lines:
 
         if re.findall(r'^require\s*', line):
@@ -489,10 +490,12 @@ def write_modify_to_mod(modifies):
 
         if tag == 0:
             msg = msg + line + '\n'
+            continue
 
         if tag == 1:
             if re.findall(r"^replace", line):
                 tag = 2
+                label = 1
                 msg = msg + 'require' + ' (' + '\n'
                 for r in ansr:
                     msg = msg + r + '\n'
@@ -501,6 +504,23 @@ def write_modify_to_mod(modifies):
                 continue
         if tag == 2:
             msg = msg + line + '\n'
+    if label == 0:
+        msg = ''
+        tag = 0
+        for line in lines:
+            if re.findall(r'^require\s*', line):
+                tag = 1
+
+            if tag == 0:
+                msg = msg + line + '\n'
+                continue
+
+            if tag == 1:
+                msg = msg + 'require' + ' (' + '\n'
+                for r in ansr:
+                    msg = msg + r + '\n'
+                msg = msg + ')\n'
+                break
     f = open('./pkg/hgfgdsy=migtry@v0.0.0/go.mod', 'w')
     f.write(msg)
     f.close()
@@ -667,19 +687,18 @@ def read_in_file(pathname, file_type_descriptor):
 
         upgrade_list = []
         go_list = deal_local_repo_dir(repo_id, 0, reference)
-        # print('length = ' + str(len(go_list)))
         nd_path = os.path.join('.', 'pkg')
         repo_url = os.path.join(nd_path, repo_id)
 
         (all_direct_r, all_direct_dep) = deal_local_repo_dir(repo_id, 1, reference)
         count = 0
+        shut_down = 0
         for d in all_direct_dep:
             redirected = 0
             r = all_direct_r[count]
             count = count + 1
             origin_repo_name = d[2]
             github_repo_name = d[0]
-            print(github_repo_name)
             if r.Version != '':
                 if d[4] != '':
                     github_repo_name = d[4]
@@ -691,15 +710,16 @@ def read_in_file(pathname, file_type_descriptor):
                 path = 'github.com/' + github_repo_name
 
                 if github_repo_name != '':
-                    valid = check_repo_db_for_valid(github_repo_name, r.Version, "")
-                    if valid == -1:
-                        valid = check_repo_valid(path, r.Version)
+                    # valid = check_repo_db_for_valid(github_repo_name, r.Version, "")
+                    # if valid == -1:
+                    valid = check_repo_valid(path, r.Version)
                     new_path = ''
                     if valid == 1:
                         new_path = get_redirect_repo(github_repo_name)
                         if new_path == '':
                             err = MessageMiss(origin_repo_name, r.Version, 1, file_type_descriptor)
                             errors.append(err)
+                            shut_down = 1
                             break
                             # new_path = get_new_url(path)
                         else:
@@ -731,10 +751,10 @@ def read_in_file(pathname, file_type_descriptor):
                         err = MessageMiss(origin_repo_name, r.Version, 2, file_type_descriptor)
                         errors.append(err)
 
-                        valid = check_repo_db_for_valid(origin_repo_name, "", r.Revision)
-
-                        if valid == -1:
-                            valid = check_repo_valid(path, r.Revision)
+                        # valid = check_repo_db_for_valid(origin_repo_name, "", r.Revision)
+                        #
+                        # if valid == -1:
+                        valid = check_repo_valid(path, r.Revision)
 
                         if valid == 2:  # TODO get last version here
                             (v_name, v_hash, search_e) = get_last_version_or_hashi(github_repo_name, 0)
@@ -844,16 +864,17 @@ def read_in_file(pathname, file_type_descriptor):
                 path = 'github.com/' + github_repo_name
 
                 if github_repo_name != '':
-                    valid = check_repo_db_for_valid(github_repo_name, "", r.Revision)
-
-                    if valid == -1:
-                        valid = check_repo_valid(path, r.Revision)
+                    # valid = check_repo_db_for_valid(github_repo_name, "", r.Revision)
+                    #
+                    # if valid == -1:
+                    valid = check_repo_valid(path, r.Revision)
 
                     if valid == 1:
                         new_path = get_redirect_repo(github_repo_name)
                         if new_path == '':
                             err = MessageMiss(origin_repo_name, r.Revision, 1, file_type_descriptor)
                             errors.append(err)
+                            shut_down = 1
                             break
                         else:
                             # replaces.append((origin_repo_name, 'github.com/' + new_path, r.Revision))
@@ -927,6 +948,12 @@ def read_in_file(pathname, file_type_descriptor):
                     requires.append(origin_repo_name + ' ' + r.Revision)
                     reqlist.append([origin_repo_name, r.Revision])
 
+        if shut_down == 1:
+            print('some dependency has missing')
+            msg = tackle_errors(errors)
+            print(msg)
+            return
+
         for r in reference:
             if r not in all_direct_r:
                 if r.Source != '':
@@ -967,21 +994,33 @@ def read_in_file(pathname, file_type_descriptor):
 
         (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod tidy')
 
-        print(b)
+        f = open('../tokens/recordtidy.txt', 'w+')
+        f.write(b)
+        f.close()
+
+        if a != 0:
+            print('encounter errors when migrate')
+            return
 
         diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
 
         modifies = []
 
+        f = open('../tokens/recordwhy.txt', 'w+')
+        f.write(b)
+        f.close()
+
         for dif in diffs:  # 可以优化
             after = dif[0]
             diff_type = dif[1]
             (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod why ' + after[0])
-            print(a, b)
+            f = open('../tokens/recordwhy.txt', 'a+')
+            f.write(b)
+            f.close()
             chain = out_to_list(a, b)  # chain is start with the project itself
             length = len(chain)
 
-            if length == 1:
+            if length == 1 or length == 0:
                 continue
 
             if chain[0] in repnames:

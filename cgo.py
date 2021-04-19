@@ -2,8 +2,8 @@ from pip._vendor.distlib.compat import raw_input
 
 
 def get_module_path():
-    # mp = raw_input("Module path is : ")
-    return 'github.com/hgfgdsy/sec'
+    mp = raw_input("Module path is : ")
+    return mp
 
 
 def get_go_version():

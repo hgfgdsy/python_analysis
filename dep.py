@@ -58,8 +58,8 @@ def parse_gopkg_lock(file_type_descriptor, data):
 
                 source = out.decode('utf-8')
 
-                if source != "":
-                    reference[list_length - 1].set_source(val)
+                # if source != "":
+                #     reference[list_length - 1].set_source(source)
         else:
             if key == "version":
                 if not isvalid(val) or canonical(val) != val:
