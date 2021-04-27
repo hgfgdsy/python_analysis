@@ -30,7 +30,10 @@ def parse_glide_lock(file_type_descriptor, data):
             if name != "" and version != "":
                 another = pkg()
                 another.set_path(name)
-                another.set_revision(version)
+                if version[0] == 'v' or len(version) <= 30:
+                    another.set_version(version)
+                else:
+                    another.set_revision(version)
                 reference.append(another)
 
     return reference

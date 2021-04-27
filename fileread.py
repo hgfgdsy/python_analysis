@@ -546,6 +546,23 @@ def write_modify_to_mod(modifies):
     #         requires_list.append(require_r)
 
 
+def write_extra_rps_to_mod(rps):
+    f = open('./pkg/hgfgdsy=migtry@v0.0.0/go.mod', 'r')
+
+    go_mod_content = f.read()
+
+    lines = go_mod_content.split('\n')
+
+    label = 0
+    msg = ''
+
+    for line in lines:
+
+        if re.findall(r'^replace', line):
+            label = 1
+    return
+
+
 def hash_name(repo):
     sha1 = hashlib.sha1()
     sha1.update(repo.encode('utf-8'))
@@ -611,7 +628,7 @@ def check_redirected(old, github_repo_name):
     if new_path == '':
         new_path = check_now_repo(old)
         if new_path != '':
-            domain = re.findall(r'^([^/]+?)/')
+            domain = re.findall(r'^([^/]+?)/', new_path)
             if domain == 'github.com':
                 return 1, new_path.replace('github.com/', '')
             else:
@@ -669,6 +686,75 @@ def revision_major(origin_repo_name, file_type_descriptor, errors, redirected, r
             add_suffix(origin_repo_name, origin_repo_name + '/' + 'v' + str(use_version), repo_url, go_list)
 
     return errors, replaces, requires, reqlist
+
+
+def re_module_path(f_content, modulediff):
+    lines = f_content.split('\n')
+
+    label = 0
+    real = ''
+
+    for line in lines:
+        if label == 1:
+            require = re.findall(r'but was required as: (.*)$', line)
+            if require and version != '' and real != '':
+                modulediff.append((real, require[0], version))
+                version = ''
+                real = ''
+            label = 0
+            continue
+
+        versionll = re.findall(r'@(.*): parsing go.mod:$', line)
+        if versionll:
+            version = versionll[0]
+            continue
+
+        reallist = re.findall(r'module declares its path as: (.*)$', line)
+        if reallist:
+            real = reallist[0]
+            label = 1
+
+    return modulediff
+
+
+def simple_repo_exist(repo):
+    if not re.findall(r'^github.com/', repo):
+        return -1
+
+    header = get_headers()
+    repo_url = 'https://api.github.com/repos/' + repo.replace('github.com', '')
+
+    insert_error = 0
+
+    try:
+        page_detail = get_results(repo_url, header)
+        insert_error = 0
+    except Exception as exp:
+        insert_error = 1
+        print('repo', repo, 'does not exist, cause is ####', exp, '####')
+
+    return insert_error
+
+
+def download_extra_repo(need, version):
+    pkg_name = need.replace('/', '=') + '@' + version
+    if os.path.isdir('./extra_module_path_wrong_pkgs/' + pkg_name):
+        return [0, pkg_name]
+    get_dep = DOWNLOAD([need, version])
+    get_dep.down_load_unzip()
+    download_result = get_dep.download_result
+    if download_result == -1:
+        return [-1, '']
+    return[0, pkg_name]
+
+
+def module_path_wrong(rps, need, real, version):
+    (ddid, ret_need) = download_extra_repo(need, version)
+
+    if ddid == 0:
+        rps.append((real, ret_need, 'v0.0.0'))
+
+    return rps
 
 
 def read_in_file(pathname, file_type_descriptor):
@@ -736,6 +822,14 @@ def read_in_file(pathname, file_type_descriptor):
                         if redirected == 2:
                             err = MessageMiss(origin_repo_name, new_path, 8,
                                               file_type_descriptor)
+                            use_version = get_version_type(github_repo_name, r.Version)
+                            if use_version >= 2:
+                                replaces.append((origin_repo_name,
+                                                 new_path + '/' + 'v' + str(use_version),
+                                                 r.Version))
+                                requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                reqlist.append([origin_repo_name, 'v0.0.0'])
+                                continue
                             errors.append(err)
                             replaces.append((origin_repo_name, new_path, r.Version))
                             requires.append(origin_repo_name + ' ' + 'v0.0.0')
@@ -998,9 +1092,27 @@ def read_in_file(pathname, file_type_descriptor):
         f.write(b)
         f.close()
 
+        raw_replaces = []
+
         if a != 0:
-            print('encounter errors when migrate')
-            return
+            bcon = re.findall('module declares its path as', b)
+            if not bcon:
+                print('encounter errors when migrate')
+                return
+            else:
+                mm = []
+                mm = re_module_path(b, mm)
+                if mm:
+                    for r in mm:
+                        real = r[0]
+                        need = r[1]
+                        version = r[2]
+                        valid = simple_repo_exist(need)
+                        if valid == 0:
+                            raw_replaces.append((need, real, version))
+                        else:
+                            raw_replaces = module_path_wrong(raw_replaces, need, real, version)
+
 
         diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
 
