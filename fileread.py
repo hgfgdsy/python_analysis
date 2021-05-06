@@ -1,7 +1,8 @@
-from dep import parse_gopkg_lock
 from cgo import write_go_mod
 import re
 from suffix import get_version_type, get_major, get_revision_type
+from glide import get_hash
+
 
 import requests
 from urllib.request import Request, urlopen
@@ -113,30 +114,6 @@ def get_last_hash(repo_name):
         last_commt = ''
         print("************** get search releases_url error", exp, '*******************************************')
     return last_commt
-
-
-# get hash through version, 获取一个版本对应的哈希值，需要补充一个通过哈希值获取版本的方法 ~~~
-def get_hash(url, search_e):
-    v_hash = ''
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0'
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        content = response.content.decode('utf-8')
-        soup = BeautifulSoup(content, "lxml")
-        # f6 link-gray text-mono ml-2 d-none d-lg-inline
-        div_msg = str(soup.find('a', class_='f6 link-gray text-mono ml-2 d-none d-lg-inline'))
-        div_msg = div_msg.strip('').replace('\n', '')
-        # print(div_msg)
-        hash_str = re.findall(r">([0-9a-zA-Z]+?)</a>", div_msg)
-        # print(hash_str)
-        if hash_str:
-            v_hash = hash_str[0]
-    except Exception as exp:
-        search_e = search_e + 1
-        print("get hash error:", exp, "**************************************************")
-    return v_hash, search_e
 
 
 def get_last_version_or_hashi(repo_name, search_e):
@@ -757,15 +734,17 @@ def module_path_wrong(rps, need, real, version):
     return rps
 
 
-def read_in_file(pathname, file_type_descriptor):
+def read_in_file(pathname, file_type_descriptor, rrf):
     dic_rec_ver = {}
     errors = []
     replaces = []
-    if file_type_descriptor == 1:
-        path = os.path.join(pathname, 'Gopkg.lock')
-        f = open(path)
-        data = f.read()
-        reference = parse_gopkg_lock(file_type_descriptor, data)
+    if file_type_descriptor != 0:
+        # path = os.path.join(pathname, 'Gopkg.lock')
+        # f = open(path)
+        # data = f.read()
+        # f.close()
+        # reference = parse_gopkg_lock(file_type_descriptor, data)
+        reference = rrf
         repo_id = re.findall(r'/([^/]+?)$', pathname)[0]
 
         requires = []
@@ -1099,20 +1078,19 @@ def read_in_file(pathname, file_type_descriptor):
             if not bcon:
                 print('encounter errors when migrate')
                 return
-            else:
-                mm = []
-                mm = re_module_path(b, mm)
-                if mm:
-                    for r in mm:
-                        real = r[0]
-                        need = r[1]
-                        version = r[2]
-                        valid = simple_repo_exist(need)
-                        if valid == 0:
-                            raw_replaces.append((need, real, version))
-                        else:
-                            raw_replaces = module_path_wrong(raw_replaces, need, real, version)
-
+            # else:
+            #     mm = []
+            #     mm = re_module_path(b, mm)
+            #     if mm:
+            #         for r in mm:
+            #             real = r[0]
+            #             need = r[1]
+            #             version = r[2]
+            #             valid = simple_repo_exist(need)
+            #             if valid == 0:
+            #                 raw_replaces.append((need, real, version))
+            #             else:
+            #                 raw_replaces = module_path_wrong(raw_replaces, need, real, version)
 
         diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
 
@@ -1226,167 +1204,6 @@ def read_in_file(pathname, file_type_descriptor):
                 write_modify_to_mod(modifies)
         msg = tackle_errors(errors)
         print(msg)
-                # version = after[1]
-                # for repo in chain:
-                #     ret = download_a_repo(repo, version)
-                #     if ret[0] != 0:
-                #         err = MessageMiss(repo, version, 3)
-                #         errors.append(err)
-                #         break
-                #
-                #     all_deps = deal_local_repo_dir(ret[1], 2, [])
-                #     ver = ''
-                #     for r in all_deps:
-                #         if r[0] == repo:
-                #             if r[1] != '':
-                #                 ver = r[1]
-
-
-
-
-
-
-
-
-
-
-        #
-        # requires = []
-        # for r in reference:
-        #     if r.Path == "" or (r.Version == "" and r.Revision == ""):
-        #         print("wrong reference!")
-        #     else:
-        #         if r.Source != "":  # source should be replace
-        #             path = r.Source
-        #             if r.Version == "":
-        #                 replaces.append((r.Path, r.Source, r.Revision))
-        #             else:
-        #                 replaces.append((r.Path, r.Source, r.Version))
-        #         else:
-        #             path = r.Path
-        #
-        #         all_direct_dep = deal_local_repo_dir()
-        #         if not re.findall(r'^github.com/', path):  # TODO(download/check pkgs from other sources)
-        #             if r.Version != "":
-        #                 requires.append(path + ' ' + r.Version)
-        #             else:
-        #                 requires.append(path + ' ' + r.Revision)
-        #         else:
-        #             if r.Version != "":
-        #                 valid = check_repo_db_for_valid(path.replace('github.com/', ''), r.Version, "")
-        #                 if valid == -1:
-        #                     valid = check_repo_valid(path, r.Version)
-        #
-        #                 new_path = ''
-        #                 if valid == 1:
-        #                     new_path = get_redirect_repo(path.replace('github.com/', ''))
-        #                     if new_path == '':
-        #                         new_path = get_new_url(path)
-        #                     else:
-        #                         replaces.append((path, 'github.com/' + new_path, r.Version))
-        #                         valid = 0
-        #
-        #                     if new_path == '':
-        #                         err = MessageMiss(path, r.Version, 1)
-        #                         errors.append(err)
-        #                     elif valid != 0:
-        #                         replaces.append((path, new_path, r.Version))
-        #                         valid = 0
-        #
-        #                 if valid == 2:
-        #                     err = MessageMiss(path, r.Version, 2)
-        #                     errors.append(err)
-        #
-        #                 if valid != 0:
-        #                     valid = check_repo_db_for_valid(path, "", r.Revision)
-        #
-        #                     if valid == -1:
-        #                         valid = check_repo_valid(path, r.Revision)
-        #
-        #                     new_path = ''
-        #                     if valid == 1:
-        #                         new_path = get_redirect_repo(path.replace('github.com/', ''))
-        #                         if new_path == '':
-        #                             new_path = get_new_url(path)
-        #                         else:
-        #                             replaces.append((path, 'github.com/' + new_path, r.Revision))
-        #                             valid = 0
-        #
-        #                         if new_path == '':
-        #                             err = MessageMiss(path, r.Revision, 1)
-        #                             errors.append(err)
-        #                         elif valid != 0:
-        #                             replaces.append((path, new_path, r.Revision))
-        #                             valid = 0
-        #
-        #                     if valid == 2:
-        #                         err = MessageMiss(path, r.Revision, 2)
-        #                         errors.append(err)
-        #
-        #                     if valid == 0:
-        #                         requires.append(path + ' ' + r.Revision)
-        #                         continue
-        #                     else:
-        #                         continue
-        #
-        #                 use_version = get_version_type(path, r.Version)
-        #                 if use_version == -11:
-        #                     requires.append(path + ' ' + r.Version)
-        #
-        #                 if use_version == -10:
-        #                     err = MessageMiss(path, r.Version, 10)
-        #                     requires.append(path + ' ' + r.Revision)
-        #
-        #                 if use_version == -1:
-        #                     print("It should not occur!(where major version doesn't equal to version in module path)")
-        #
-        #                 if use_version == 0:  # no go.mod in dst pkg
-        #                     requires.append(path + ' ' + r.Version + '+incompatible')
-        #
-        #                 if use_version == 1:  # has go.mod but in module path no version suffix
-        #                     requires.append(path + ' ' + r.Revision)
-        #
-        #                 if use_version >= 2:
-        #                     requires.append(path + '/' + 'v' + str(use_version) + ' ' + r.Version)
-        #             else:
-        #                 valid = check_repo_db_for_valid(path.replace('github.com/', ''), "", r.Revision)
-        #
-        #                 if path == 'github.com/caicloud/cyclone':
-        #                     print(valid)
-        #                 if valid == -1:
-        #                     valid = check_repo_valid(path, r.Revision)
-        #
-        #                 if path == 'github.com/caicloud/cyclone':
-        #                     print(valid)
-        #
-        #                 new_path = ''
-        #                 if valid == 1:
-        #                     new_path = get_redirect_repo(path.replace('github.com/', ''))
-        #                     if new_path == '':
-        #                         new_path = get_new_url(path)
-        #                     else:
-        #                         replaces.append((path, 'github.com/' + new_path, r.Revision))
-        #                         valid = 0
-        #
-        #                     if new_path == '':
-        #                         err = MessageMiss(path, r.Revision, 1)
-        #                         errors.append(err)
-        #                     elif valid != 0:
-        #                         replaces.append((path, new_path, r.Revision))
-        #                         valid = 0
-        #
-        #                 if valid == 2:
-        #                     err = MessageMiss(path, r.Revision, 2)
-        #                     errors.append(err)
-        #
-        #                 if valid != 0:
-        #                     continue
-        #                 requires.append(path + ' ' + r.Revision)
-        # for r in requires:
-        #     print(r)
-        #
-        # for r in replaces:
-        #     print(r)
 
     else:
         f = open(pathname + "/glide.lock")

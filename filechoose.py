@@ -1,6 +1,8 @@
 import os
 
 from fileread import read_in_file
+from dep import parse_gopkg_lock
+from glide import parse_glide_lock
 
 
 def str_compare(filename):
@@ -26,4 +28,17 @@ def choose_file(pathname):
         elif target_file_count > 1:
             print("too many possible Configfile found: In " + pathname + " !\n")
     else:
-        read_in_file(pathname, file_type_descriptor)
+        if file_type_descriptor == 1:
+            path = os.path.join(pathname, 'Gopkg.lock')
+            f = open(path)
+            data = f.read()
+            f.close()
+            reference = parse_gopkg_lock(file_type_descriptor, data)
+            read_in_file(pathname, file_type_descriptor, reference)
+        elif file_type_descriptor == 2:
+            path = os.path.join(pathname, 'glide.lock')
+            f = open(path)
+            data = f.read()
+            f.close()
+            reference = parse_glide_lock(file_type_descriptor, data)
+            read_in_file(pathname, file_type_descriptor, reference)
