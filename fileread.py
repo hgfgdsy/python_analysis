@@ -533,10 +533,41 @@ def write_extra_rps_to_mod(rps):
     label = 0
     msg = ''
 
+    asr = []
+
     for line in lines:
 
         if re.findall(r'^replace', line):
             label = 1
+            if re.findall(r'=>', line):
+                asr.append(line.replace('replace', '').strip())
+                break
+
+        if label == 0:
+            msg = msg + line
+
+        if label == 1:
+            if re.findall(r'\)', line):
+                break
+
+            if re.findall(r'=>', line):
+                asr.append(line.replace('replace', '').strip())
+
+    msg = msg + '\n'
+
+    msg = msg + 'replace (' + '\n'
+
+    for rep in asr:
+        msg = msg + rep + '\n'
+
+    for r in rps:
+        msg = msg + r[0] + ' ' + ' => ' + r[1] + ' ' + r[2] + '\n'
+    msg = msg + ')\n'
+
+    f = open('./pkg/hgfgdsy=migtry@v0.0.0/go.mod', 'w')
+    f.write(msg)
+    f.close()
+
     return
 
 
@@ -1072,25 +1103,30 @@ def read_in_file(pathname, file_type_descriptor, rrf):
         f.close()
 
         raw_replaces = []
+        rpsfirst = []
 
         if a != 0:
             bcon = re.findall('module declares its path as', b)
             if not bcon:
                 print('encounter errors when migrate')
                 return
-            # else:
-            #     mm = []
-            #     mm = re_module_path(b, mm)
-            #     if mm:
-            #         for r in mm:
-            #             real = r[0]
-            #             need = r[1]
-            #             version = r[2]
-            #             valid = simple_repo_exist(need)
-            #             if valid == 0:
-            #                 raw_replaces.append((need, real, version))
-            #             else:
-            #                 raw_replaces = module_path_wrong(raw_replaces, need, real, version)
+            else:
+                mm = []
+                mm = re_module_path(b, mm)
+                if mm:
+                    for r in mm:
+                        real = r[0]
+                        need = r[1]
+                        version = r[2]
+                        valid = simple_repo_exist(need)
+                        if valid == -1:
+                            print('encounter errors when migrate')
+                            return
+                        else:
+                            raw_replaces = module_path_wrong(raw_replaces, need, real, version)
+                            rpsfirst.append((need, 'v0.0.0'))
+                    write_modify_to_mod(rpsfirst)
+                    write_extra_rps_to_mod(raw_replaces)
 
         diffs = get_diffs(reqlist, all_direct_r, all_direct_dep)
 
