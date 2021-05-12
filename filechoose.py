@@ -13,7 +13,7 @@ def str_compare(filename):
     return 0
 
 
-def choose_file(pathname):
+def choose_file(pathname, module_path):
     files = os.listdir(pathname)
     target_file_count = 0
     file_type_descriptor = 0
@@ -22,6 +22,7 @@ def choose_file(pathname):
             if str_compare(file) != 0:
                 file_type_descriptor = str_compare(file)
                 target_file_count = target_file_count + 1
+    tlp = []
     if target_file_count != 1:
         if target_file_count == 0:
             print("No Configfile found: In " + pathname + " !\n")
@@ -34,11 +35,12 @@ def choose_file(pathname):
             data = f.read()
             f.close()
             reference = parse_gopkg_lock(file_type_descriptor, data)
-            read_in_file(pathname, file_type_descriptor, reference)
+            tlp = read_in_file(pathname, file_type_descriptor, reference, module_path)
         elif file_type_descriptor == 2:
             path = os.path.join(pathname, 'glide.lock')
             f = open(path)
             data = f.read()
             f.close()
             reference = parse_glide_lock(file_type_descriptor, data)
-            read_in_file(pathname, file_type_descriptor, reference)
+            tlp = read_in_file(pathname, file_type_descriptor, reference, module_path)
+    return [file_type_descriptor, tlp]

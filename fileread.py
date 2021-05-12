@@ -749,7 +749,7 @@ def download_extra_repo(need, version):
     if os.path.isdir('./extra_module_path_wrong_pkgs/' + pkg_name):
         return [0, pkg_name]
     get_dep = DOWNLOAD([need, version])
-    get_dep.down_load_unzip()
+    get_dep.down_load_unzip_extra()
     download_result = get_dep.download_result
     if download_result == -1:
         return [-1, '']
@@ -765,7 +765,7 @@ def module_path_wrong(rps, need, real, version):
     return rps
 
 
-def read_in_file(pathname, file_type_descriptor, rrf):
+def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
     dic_rec_ver = {}
     errors = []
     replaces = []
@@ -1055,8 +1055,7 @@ def read_in_file(pathname, file_type_descriptor, rrf):
         if shut_down == 1:
             print('some dependency has missing')
             msg = tackle_errors(errors)
-            print(msg)
-            return
+            return [0, msg]
 
         for r in reference:
             if r not in all_direct_r:
@@ -1090,7 +1089,7 @@ def read_in_file(pathname, file_type_descriptor, rrf):
                     reqlist.append([path, r.Revision])
 
         # TODO write a initial go.mod
-        write_go_mod(requires, replaces, reqlist)
+        write_go_mod(requires, replaces, reqlist, input_module_path)
 
         repnames = []
         for rep in replaces:
@@ -1109,7 +1108,8 @@ def read_in_file(pathname, file_type_descriptor, rrf):
             bcon = re.findall('module declares its path as', b)
             if not bcon:
                 print('encounter errors when migrate')
-                return
+                msg = tackle_errors(errors)
+                return [1, msg]
             else:
                 mm = []
                 mm = re_module_path(b, mm)
@@ -1121,7 +1121,8 @@ def read_in_file(pathname, file_type_descriptor, rrf):
                         valid = simple_repo_exist(need)
                         if valid == -1:
                             print('encounter errors when migrate')
-                            return
+                            msg = tackle_errors(errors)
+                            return [2, msg]
                         else:
                             raw_replaces = module_path_wrong(raw_replaces, need, real, version)
                             rpsfirst.append((need, 'v0.0.0'))
@@ -1239,7 +1240,7 @@ def read_in_file(pathname, file_type_descriptor, rrf):
 
                 write_modify_to_mod(modifies)
         msg = tackle_errors(errors)
-        print(msg)
+        return [3, msg]
 
     else:
         f = open(pathname + "/glide.lock")

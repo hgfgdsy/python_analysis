@@ -11,9 +11,7 @@ def get_go_version():
     return '1.15'
 
 
-def write_go_mod(requires, replaces, reqlist):
-
-    module_path = get_module_path()
+def write_go_mod(requires, replaces, reqlist, module_path):
 
     go_version = get_go_version()
 
