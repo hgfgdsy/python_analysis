@@ -69,7 +69,7 @@ class DOWNLOAD:
 
     def down_load_unzip_extra(self):
 
-        temp = 'extra_module_path_wrong_pkgs'
+        temp = './pkg/hgfgdsy=migtry@v0.0.0/extra_module_path_wrong_pkgs'
         self.dst_name = temp
 
         if not os.path.isdir(temp):

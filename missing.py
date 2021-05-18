@@ -34,6 +34,8 @@ class MessageMiss:
             msg = 'dependency ' + self.repo_name + ' has been redirected, new repo name is ' + self.repo_version
         elif self.error_type == 9:  # 递归分析间接依赖时，由于各种原因失败（比如没有配置文件）
             msg = 'fail to recursively analyze indirect dependencies for ' + self.repo_version
+        elif self.error_type == 90:
+            msg = 'a good case right?'
         return msg
 
 

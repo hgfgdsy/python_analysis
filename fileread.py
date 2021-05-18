@@ -389,11 +389,17 @@ def get_diffs(reqlist, all_direct_r, all_direct_dep):
 
 def out_to_list(a, b):
     lines = b.split('\n')
-    lines = lines[2:]
-    chain = []
+    alll = []
+    # lines = lines[2:]
     for line in lines:
+        if not re.findall(r'^ERROR:', line):
+            alll.append(line)
+    chain = []
+    alll = alll[2:]
+    for line in alll:
         if line != '':
-            chain.append(line)
+            if re.findall(r'^.+?\..+?/', line):
+                chain.append(line)
     return chain
 
 
@@ -745,22 +751,23 @@ def simple_repo_exist(repo):
 
 
 def download_extra_repo(need, version):
-    pkg_name = need.replace('/', '=') + '@' + version
-    if os.path.isdir('./extra_module_path_wrong_pkgs/' + pkg_name):
-        return [0, pkg_name]
+    namerw = need.replace('github.com/', '')
+    pkg_name = namerw.replace('/', '=') + '@' + version
+    if os.path.isdir('./pkg/hgfgdsy=migtry@v0.0.0/extra_module_path_wrong_pkgs/' + pkg_name):
+        return [0, './extra_module_path_wrong_pkgs/' + pkg_name]
     get_dep = DOWNLOAD([need, version])
     get_dep.down_load_unzip_extra()
     download_result = get_dep.download_result
     if download_result == -1:
         return [-1, '']
-    return[0, pkg_name]
+    return[0, './extra_module_path_wrong_pkgs/' + pkg_name]
 
 
 def module_path_wrong(rps, need, real, version):
     (ddid, ret_need) = download_extra_repo(need, version)
 
     if ddid == 0:
-        rps.append((real, ret_need, 'v0.0.0'))
+        rps.append((need, ret_need, ''))
 
     return rps
 
@@ -919,6 +926,12 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
                             requires.append(origin_repo_name + ' ' + r.Version)
                             reqlist.append([origin_repo_name, r.Version])
                     if use_version == -1:
+                        raw_replaces_suffix = []
+                        raw_replaces_suffix = module_path_wrong(raw_replaces_suffix, origin_repo_name, ' ', r.Version)
+                        if raw_replaces_suffix:
+                            reqlist.append((origin_repo_name, 'v0.0.0'))
+                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                            replaces.append(raw_replaces_suffix[0])
                         print("It should not occur!(where major version doesn't equal to version in module path)")
 
                     if use_version == 0:  # no go.mod in dst pkg
@@ -1107,7 +1120,7 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
         if a != 0:
             bcon = re.findall('module declares its path as', b)
             if not bcon:
-                print('encounter errors when migrate')
+                print('encounter errors when migrate(in go mod tidy)')
                 msg = tackle_errors(errors)
                 return [1, msg]
             else:
@@ -1140,12 +1153,18 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
         for dif in diffs:  # 可以优化
             after = dif[0]
             diff_type = dif[1]
+            print(after[0])
             (a, b) = subprocess.getstatusoutput('cd pkg/hgfgdsy=migtry@v0.0.0 && go mod why ' + after[0])
             f = open('../tokens/recordwhy.txt', 'a+')
             f.write(b)
             f.close()
             chain = out_to_list(a, b)  # chain is start with the project itself
             length = len(chain)
+            print(length)
+            for i in chain:
+                print(i)
+
+            print('\n')
 
             if length == 1 or length == 0:
                 continue
@@ -1158,6 +1177,7 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
             for d in all_direct_dep:
                 now_dep_list.append([d[2], d[1]])
             if diff_type == 1:
+                moditag = 0
                 rec_name = ''
                 rec_version = ''
                 cnt = 0
@@ -1166,14 +1186,17 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
                     if not now_dep_list:
                         err = MessageMiss(repo, chain[0], 9, file_type_descriptor)
                         errors.append(err)
+                        moditag = 1
                         break
                     for d in now_dep_list:
                         if d[0] == repo:
                             ver = d[1]
+                            moditag = 1
                             break
                     if ver == '':
                         err = MessageMiss(repo, chain[0], 5, file_type_descriptor)
                         errors.append(err)
+                        moditag = 1
                         break
                     else:
                         cnt = cnt + 1
@@ -1189,28 +1212,39 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
                             if ret[0] != 0:
                                 err = MessageMiss(repo, chain[0], 6, file_type_descriptor)
                                 errors.append(err)
+                                moditag = 1
                                 break
 
                             all_deps = deal_local_repo_dir(ret[1], 2, [])
                             dic_rec_ver[hname] = all_deps
                             now_dep_list = all_deps
 
-                if rec_name != '' and rec_version != '':
+                if rec_name != '' and rec_version != '' and moditag == 0:
                     if rec_version != after[1]:
+                        err = MessageMiss(after[1], chain[0], 90, file_type_descriptor)
+                        errors.append(err)
                         modifies.append([rec_name, rec_version])
             else:
+                moditag = 0
                 rec_name = ''
                 rec_version = ''
                 cnt = 0
                 for repo in chain:
                     ver = ''
+                    if not now_dep_list:
+                        err = MessageMiss(repo, chain[0], 9, file_type_descriptor)
+                        errors.append(err)
+                        moditag = 1
+                        break
                     for d in now_dep_list:
                         if d[0] == repo:
                             ver = d[1]
+                            moditag = 1
                             break
                     if ver == '':
                         err = MessageMiss(repo, chain[0], 5, file_type_descriptor)
                         errors.append(err)
+                        moditag = 1
                         break
                     else:
                         cnt = cnt + 1
@@ -1226,15 +1260,16 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
                             if ret[0] != 0:
                                 err = MessageMiss(repo, chain[0], 6, file_type_descriptor)
                                 errors.append(err)
+                                moditag = 1
                                 break
 
                             all_deps = deal_local_repo_dir(ret[1], 2, [])
                             dic_rec_ver[hname] = all_deps
                             now_dep_list = all_deps
 
-                if rec_name != '' and rec_version != '':
+                if rec_name != '' and rec_version != '' and moditag == 0:
                     if rec_version != after[1]:
-                        err = MessageMiss(rec_name, rec_version, 7, file_type_descriptor)
+                        err = MessageMiss(after[1], chain[0], 90, file_type_descriptor)
                         errors.append(err)
                         modifies.append([rec_name, rec_version])
 

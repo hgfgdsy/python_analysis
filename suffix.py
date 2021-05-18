@@ -58,9 +58,9 @@ def get_version_type(name, version):
 
     if os.path.isdir('./pkg1/' + pkg_name):
         r_type = get_local_pkg('./pkg1/' + pkg_name)
-        if r_type < 2:
+        if r_type < 2 and int(major) < 2:
             return r_type
-        if r_type != 1 and r_type != int(major):
+        if r_type == 1 and r_type != int(major):
             return -1
         else:
             return r_type
@@ -75,7 +75,9 @@ def get_version_type(name, version):
         r_type = get_local_pkg(pkg_path)
     else:
         r_type = -10
-    if r_type < 2:
+
+    print(int(major))
+    if r_type < 2 and int(major) < 2:
         return r_type
     if r_type != int(major):
         return -1
