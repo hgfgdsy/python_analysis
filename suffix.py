@@ -79,7 +79,7 @@ def get_version_type(name, version):
     print(int(major))
     if r_type < 2 and int(major) < 2:
         return r_type
-    if r_type != int(major):
+    if r_type == 1 and r_type != int(major):
         return -1
     else:
         return r_type

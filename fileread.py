@@ -853,11 +853,10 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
                             reqlist.append([origin_repo_name, 'v0.0.0'])
                             continue
                         elif redirected == 1:
-                            err = MessageMiss(origin_repo_name, 'github.com/' + github_repo_name, 8,
+                            err = MessageMiss(origin_repo_name, 'github.com/' + new_path, 8,
                                               file_type_descriptor)
                             errors.append(err)
                             github_repo_name = new_path
-
                     if valid == 2:
                         err = MessageMiss(origin_repo_name, r.Version, 2, file_type_descriptor)
                         errors.append(err)
@@ -866,9 +865,13 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
                         #
                         # if valid == -1:
                         valid = check_repo_valid(path, r.Revision)
+                        if origin_repo_name == 'github.com/kataras/iris':
+                            print(valid)
 
                         if valid == 2:  # TODO get last version here
                             (v_name, v_hash, search_e) = get_last_version_or_hashi(github_repo_name, 0)
+                            print('This repo is ' + origin_repo_name + ', and its version gone. \n vname is ' + v_name +
+                                  ', v_hash is ' + v_hash)
                             if v_name != '':
                                 if redirected == 1:
                                     replaces.append((origin_repo_name, 'github.com/' + github_repo_name, v_name))
@@ -926,22 +929,27 @@ def read_in_file(pathname, file_type_descriptor, rrf, input_module_path):
                             requires.append(origin_repo_name + ' ' + r.Version)
                             reqlist.append([origin_repo_name, r.Version])
                     if use_version == -1:
-                        raw_replaces_suffix = []
-                        raw_replaces_suffix = module_path_wrong(raw_replaces_suffix, origin_repo_name, ' ', r.Version)
-                        if raw_replaces_suffix:
-                            reqlist.append((origin_repo_name, 'v0.0.0'))
-                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
-                            replaces.append(raw_replaces_suffix[0])
-                        print("It should not occur!(where major version doesn't equal to version in module path)")
+                        i = re.findall(r'gopkg.in/', origin_repo_name)
+                        if not i:
+                            raw_replaces_suffix = []
+                            raw_replaces_suffix = module_path_wrong(raw_replaces_suffix, origin_repo_name, ' ',
+                                                                    r.Version)
+                            if raw_replaces_suffix:
+                                reqlist.append((origin_repo_name, 'v0.0.0'))
+                                requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                replaces.append(raw_replaces_suffix[0])
+                            print("It should not occur!(where major version doesn't equal to version in module path)")
 
                     if use_version == 0:  # no go.mod in dst pkg
-                        if redirected == 1:
-                            replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Version))
-                            requires.append(origin_repo_name + ' ' + 'v0.0.0')
-                            reqlist.append([origin_repo_name, 'v0.0.0'])
-                        else:
-                            requires.append(origin_repo_name + ' ' + r.Version + '+incompatible')
-                            reqlist.append([origin_repo_name, r.Version])
+                        i = re.findall(r'gopkg.in/', origin_repo_name)
+                        if not i:
+                            if redirected == 1:
+                                replaces.append((origin_repo_name, 'github.com/' + github_repo_name, r.Version))
+                                requires.append(origin_repo_name + ' ' + 'v0.0.0')
+                                reqlist.append([origin_repo_name, 'v0.0.0'])
+                            else:
+                                requires.append(origin_repo_name + ' ' + r.Version + '+incompatible')
+                                reqlist.append([origin_repo_name, r.Version])
                     if use_version == 1:  # has go.mod but in module path no version suffix
                         i = re.findall(r'gopkg.in/', origin_repo_name)
                         if not i:
